@@ -2,7 +2,7 @@
 
 **Microsoft Sentinel detection rules and threat-hunting queries for Entra ID, Microsoft 365, Azure, AWS, Defender for Endpoint and Active Directory, mapped to MITRE ATT&CK. Every rule ships with sample logs and a test that proves it fires on the attack and stays quiet on the look-alikes. Deployable in one click.**
 
-> All users, domains, IPs and events in the sample data are fictional (contoso.com, documentation IP ranges, made-up account IDs).
+> Built with Claude; designed, reviewed and tested by me. All users, domains, IPs and events in the sample data are fictional (contoso.com, documentation IP ranges, made-up account IDs).
 
 ## Why this exists
 

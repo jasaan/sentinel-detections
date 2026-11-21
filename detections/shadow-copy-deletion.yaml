@@ -1,0 +1,41 @@
+id: 5253c30f-db73-55c3-b3bd-0df44c1bc13b
+name: Shadow copy or backup catalog deletion
+description: |
+  Ransomware deletes Volume Shadow Copies and backup catalogs, and turns off Windows recovery, so victims can't restore
+  files. These commands are rare in normal operations and usually come minutes before encryption starts.
+  Tuning: allow-list documented backup software only after confirming its command lines. Treat any hit as a possible
+  active incident.
+severity: High
+requiredDataConnectors:
+  - connectorId: MicrosoftThreatProtection
+    dataTypes:
+      - DeviceProcessEvents
+queryFrequency: 15m
+queryPeriod: 15m
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - Impact
+relevantTechniques:
+  - T1490
+query: |
+  DeviceProcessEvents
+  | where TimeGenerated > ago(15m)
+  | where (FileName =~ "vssadmin.exe" and ProcessCommandLine has_all ("delete", "shadows"))
+      or (FileName =~ "wmic.exe" and ProcessCommandLine has_all ("shadowcopy", "delete"))
+      or (FileName =~ "wbadmin.exe" and ProcessCommandLine has_all ("delete", "catalog"))
+      or (FileName =~ "bcdedit.exe" and ProcessCommandLine has "recoveryenabled" and ProcessCommandLine has "no")
+      or (FileName in~ ("powershell.exe", "pwsh.exe") and ProcessCommandLine has "Win32_ShadowCopy"
+          and (ProcessCommandLine contains "Delete" or ProcessCommandLine contains "Remove-"))
+  | project TimeGenerated, DeviceName, AccountName, FileName, ProcessCommandLine, InitiatingProcessFileName, InitiatingProcessCommandLine
+entityMappings:
+  - entityType: Host
+    fieldMappings:
+      - identifier: HostName
+        columnName: DeviceName
+  - entityType: Account
+    fieldMappings:
+      - identifier: Name
+        columnName: AccountName
+version: 1.0.0
+kind: Scheduled

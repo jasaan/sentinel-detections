@@ -1,0 +1,44 @@
+rule: detections/conditional-access-policy-disabled.yaml
+description: Deleting a policy or switching it from enabled to disabled fires; enabling a policy or renaming it doesn't.
+data:
+  AuditLogs:
+    - ago: 10m
+      OperationName: Delete conditional access policy
+      Result: success
+      InitiatedBy: {user: {userPrincipalName: mallory@contoso.com, ipAddress: 198.51.100.99}}
+      TargetResources:
+        - displayName: Require MFA for admins
+          modifiedProperties:
+            - {displayName: ConditionalAccessPolicy, oldValue: '{"id":"p1","displayName":"Require MFA for admins","state":"enabled"}', newValue: ""}
+    - ago: 10m
+      OperationName: Update conditional access policy
+      Result: success
+      InitiatedBy: {user: {userPrincipalName: mallory@contoso.com, ipAddress: 198.51.100.99}}
+      TargetResources:
+        - displayName: Block legacy authentication
+          modifiedProperties:
+            - {displayName: ConditionalAccessPolicy, oldValue: '{"id":"p2","displayName":"Block legacy authentication","state":"enabled"}', newValue: '{"id":"p2","displayName":"Block legacy authentication","state":"disabled"}'}
+    - ago: 10m
+      OperationName: Update conditional access policy
+      Result: success
+      InitiatedBy: {user: {userPrincipalName: alice@contoso.com, ipAddress: 10.0.0.40}}
+      TargetResources:
+        - displayName: Require compliant device
+          modifiedProperties:
+            - {displayName: ConditionalAccessPolicy, oldValue: '{"id":"p3","state":"disabled"}', newValue: '{"id":"p3","state":"enabled"}'}
+    - ago: 10m
+      OperationName: Update conditional access policy
+      Result: success
+      InitiatedBy: {user: {userPrincipalName: alice@contoso.com, ipAddress: 10.0.0.40}}
+      TargetResources:
+        - displayName: MFA for all users (renamed)
+          modifiedProperties:
+            - {displayName: ConditionalAccessPolicy, oldValue: '{"id":"p4","displayName":"MFA all","state":"enabled"}', newValue: '{"id":"p4","displayName":"MFA for all users (renamed)","state":"enabled"}'}
+expect:
+  rows: 2
+  include:
+    - {PolicyName: Require MFA for admins, Change: Deleted}
+    - {PolicyName: Block legacy authentication, Change: enabled -> disabled}
+  exclude:
+    - {PolicyName: Require compliant device}
+    - {PolicyName: MFA for all users (renamed)}

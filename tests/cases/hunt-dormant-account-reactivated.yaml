@@ -1,0 +1,14 @@
+rule: hunting/hunt-dormant-account-reactivated.yaml
+description: An account silent for 45 days that signs in again is listed; a recently active account isn't.
+data:
+  SigninLogs:
+    - {ago: 45d, UserPrincipalName: alice@contoso.com, ResultType: "0", IPAddress: 203.0.113.40, Location: US}
+    - {ago: 2h, UserPrincipalName: alice@contoso.com, ResultType: "0", IPAddress: 198.51.100.140, Location: BR}
+    - {ago: 3d, UserPrincipalName: bob@contoso.com, ResultType: "0", IPAddress: 203.0.113.41, Location: US}
+    - {ago: 2h, UserPrincipalName: bob@contoso.com, ResultType: "0", IPAddress: 203.0.113.41, Location: US}
+expect:
+  rows: 1
+  include:
+    - {UserPrincipalName: alice@contoso.com}
+  exclude:
+    - {UserPrincipalName: bob@contoso.com}

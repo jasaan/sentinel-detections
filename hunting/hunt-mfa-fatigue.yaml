@@ -1,0 +1,29 @@
+id: 221a714b-277a-5668-a865-31de9316d7c2
+name: MFA fatigue (repeated push denials)
+description: |
+  MFA fatigue attacks bombard a user with push prompts until they approve one. Look for users with a burst of denied or
+  failed MFA prompts in an hour, then check whether a successful sign-in followed.
+  How to hunt: start with rows where SuccessAfterDenials is true. Call the user (not by email) and ask whether they
+  approved a prompt they didn't start. If so, revoke sessions and reset credentials.
+requiredDataConnectors:
+  - connectorId: AzureActiveDirectory
+    dataTypes:
+      - SigninLogs
+tactics:
+  - CredentialAccess
+relevantTechniques:
+  - T1621
+query: |
+  let minDenials = 5;
+  let Window = SigninLogs | where TimeGenerated > ago(1d);
+  Window
+  | where ResultType == "500121"
+  | summarize Denials = count(), IPs = make_set(IPAddress, 10), FirstDenial = min(TimeGenerated), LastDenial = max(TimeGenerated)
+      by UserPrincipalName, Hour = bin(TimeGenerated, 1h)
+  | where Denials >= minDenials
+  | join kind=leftouter (
+      Window | where ResultType == "0" | summarize LastSuccess = max(TimeGenerated) by UserPrincipalName
+    ) on UserPrincipalName
+  | extend SuccessAfterDenials = isnotnull(LastSuccess) and LastSuccess > FirstDenial
+  | project UserPrincipalName, Hour, Denials, FirstDenial, LastDenial, SuccessAfterDenials, LastSuccess, IPs
+  | order by SuccessAfterDenials desc, Denials desc

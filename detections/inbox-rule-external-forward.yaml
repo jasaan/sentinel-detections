@@ -1,0 +1,44 @@
+id: f3c011d5-654b-5817-ac58-2151b9d7bb19
+name: Inbox rule forwards mail to an external address
+description: |
+  Attackers who take over a mailbox often add a rule that quietly forwards or redirects mail outside the company,
+  a key step in business email compromise.
+  Tuning: set OrgDomains to every domain you own. Expect occasional legitimate personal forwarding; confirm with the user
+  through a separate channel, not by email.
+severity: High
+requiredDataConnectors:
+  - connectorId: Office365
+    dataTypes:
+      - OfficeActivity
+queryFrequency: 1h
+queryPeriod: 1h
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - Collection
+  - Exfiltration
+relevantTechniques:
+  - T1114.003
+query: |
+  let OrgDomains = dynamic(["contoso.com"]);
+  OfficeActivity
+  | where TimeGenerated > ago(1h)
+  | where OfficeWorkload == "Exchange" and Operation in~ ("New-InboxRule", "Set-InboxRule")
+  | mv-expand Param = todynamic(Parameters)
+  | where tostring(Param.Name) in~ ("ForwardTo", "ForwardAsAttachmentTo", "RedirectTo")
+  | mv-expand Destination = split(tostring(Param.Value), ";") to typeof(string)
+  | extend Destination = trim(@"\s", replace_regex(Destination, @"(?i)^smtp:", ""))
+  | extend DestinationDomain = tolower(tostring(split(Destination, "@")[1]))
+  | where isnotempty(DestinationDomain) and not(DestinationDomain in (OrgDomains))
+  | summarize Destinations = make_set(Destination), Operations = make_set(Operation) by TimeGenerated, UserId, ClientIP
+entityMappings:
+  - entityType: Account
+    fieldMappings:
+      - identifier: FullName
+        columnName: UserId
+  - entityType: IP
+    fieldMappings:
+      - identifier: Address
+        columnName: ClientIP
+version: 1.0.0
+kind: Scheduled

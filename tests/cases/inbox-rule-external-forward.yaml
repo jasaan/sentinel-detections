@@ -1,0 +1,16 @@
+rule: detections/inbox-rule-external-forward.yaml
+description: Rules forwarding or redirecting to outside domains fire (including SMTP-prefixed, multi-recipient values); internal forwarding doesn't.
+data:
+  OfficeActivity:
+    - {ago: 15m, OfficeWorkload: Exchange, Operation: New-InboxRule, UserId: alice@contoso.com, ClientIP: 198.51.100.23, Parameters: '[{"Name":"Name","Value":"."},{"Name":"ForwardTo","Value":"invoices@protonmail.example"},{"Name":"MarkAsRead","Value":"True"}]'}
+    - {ago: 15m, OfficeWorkload: Exchange, Operation: Set-InboxRule, UserId: carol@contoso.com, ClientIP: 198.51.100.24, Parameters: '[{"Name":"Identity","Value":"Rule1"},{"Name":"RedirectTo","Value":"SMTP:carol.personal@gmail.example;dave@contoso.com"}]'}
+    - {ago: 15m, OfficeWorkload: Exchange, Operation: New-InboxRule, UserId: bob@contoso.com, ClientIP: 10.0.0.8, Parameters: '[{"Name":"Name","Value":"Team"},{"Name":"ForwardTo","Value":"dave@contoso.com"}]'}
+    - {ago: 15m, OfficeWorkload: Exchange, Operation: New-InboxRule, UserId: erin@contoso.com, ClientIP: 10.0.0.9, Parameters: '[{"Name":"Name","Value":"Newsletters"},{"Name":"MoveToFolder","Value":"News"}]'}
+expect:
+  rows: 2
+  include:
+    - {UserId: alice@contoso.com}
+    - {UserId: carol@contoso.com}
+  exclude:
+    - {UserId: bob@contoso.com}
+    - {UserId: erin@contoso.com}

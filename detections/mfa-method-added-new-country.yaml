@@ -1,0 +1,51 @@
+id: 8e4559c4-0c26-5c4f-8146-6a35820327b8
+name: New MFA method followed by sign-in from a new country
+description: |
+  After stealing a password and session, attackers register their own MFA method so they can come back. A new security
+  method followed within an hour by a successful sign-in from a country the user has not signed in from in two weeks is
+  a strong account-takeover signal.
+  Tuning: travelers will trigger this occasionally; the registration plus the new country together keep volume low.
+severity: High
+requiredDataConnectors:
+  - connectorId: AzureActiveDirectory
+    dataTypes:
+      - AuditLogs
+      - SigninLogs
+queryFrequency: 1h
+queryPeriod: 14d
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - Persistence
+  - InitialAccess
+relevantTechniques:
+  - T1098.005
+  - T1078.004
+query: |
+  let Registrations = AuditLogs
+      | where TimeGenerated > ago(2h)
+      | where OperationName in ("User registered security info", "User changed default security info") and Result =~ "success"
+      | extend UserPrincipalName = tolower(tostring(TargetResources[0].userPrincipalName))
+      | project UserPrincipalName, RegisteredAt = TimeGenerated, Registration = OperationName;
+  let History = SigninLogs
+      | where TimeGenerated between (ago(14d) .. ago(2h))
+      | where ResultType == "0"
+      | summarize KnownCountries = make_set(Location) by UserPrincipalName = tolower(UserPrincipalName);
+  SigninLogs
+  | where TimeGenerated > ago(2h)
+  | where ResultType == "0"
+  | extend UserPrincipalName = tolower(UserPrincipalName)
+  | join kind=inner Registrations on UserPrincipalName
+  | where TimeGenerated between (RegisteredAt .. (RegisteredAt + 1h))
+  | join kind=leftouter History on UserPrincipalName
+  | extend KnownCountries = iff(isnull(KnownCountries), dynamic([]), KnownCountries)
+  | where not(set_has_element(KnownCountries, Location))
+  | summarize FirstSignIn = min(TimeGenerated), IPs = make_set(IPAddress, 10), Apps = make_set(AppDisplayName, 10)
+      by UserPrincipalName, Location, RegisteredAt, Registration, KnownCountries = tostring(KnownCountries)
+entityMappings:
+  - entityType: Account
+    fieldMappings:
+      - identifier: FullName
+        columnName: UserPrincipalName
+version: 1.0.0
+kind: Scheduled

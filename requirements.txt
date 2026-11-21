@@ -1,0 +1,4 @@
+pyyaml>=6.0
+# Only needed for tools/kusto.py (optional scripted test runs; needs a work/school account, untested):
+azure-kusto-data>=4.0
+azure-identity>=1.15

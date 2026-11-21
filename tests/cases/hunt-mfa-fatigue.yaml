@@ -1,0 +1,16 @@
+rule: hunting/hunt-mfa-fatigue.yaml
+description: A burst of 7 MFA denials followed by a success is flagged (SuccessAfterDenials); 6 denials without success is listed; 2 denials isn't.
+note: Denials are packed into one minute so they share an hour bucket; in rare runs that start on the hour exactly, a burst can split across two buckets.
+data:
+  SigninLogs:
+    - {ago: 3h, _repeat: 7, _step: 5s, UserPrincipalName: alice@contoso.com, ResultType: "500121", IPAddress: 198.51.100.120}
+    - {ago: 170m, UserPrincipalName: alice@contoso.com, ResultType: "0", IPAddress: 198.51.100.120}
+    - {ago: 5h, _repeat: 6, _step: 5s, UserPrincipalName: bob@contoso.com, ResultType: "500121", IPAddress: 198.51.100.121}
+    - {ago: 4h, _repeat: 2, _step: 5s, UserPrincipalName: carol@contoso.com, ResultType: "500121", IPAddress: 10.0.0.60}
+expect:
+  rows: 2
+  include:
+    - {UserPrincipalName: alice@contoso.com, SuccessAfterDenials: true}
+    - {UserPrincipalName: bob@contoso.com, SuccessAfterDenials: false}
+  exclude:
+    - {UserPrincipalName: carol@contoso.com}

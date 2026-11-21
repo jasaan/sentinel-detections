@@ -1,0 +1,40 @@
+id: 85227ad2-82da-5add-a99c-a10617460dd7
+name: Conditional Access policy deleted or disabled
+description: |
+  Conditional Access enforces MFA and device rules. Deleting a policy, or switching it from enforced to off or
+  report-only, removes a control at once and is a known step in tenant takeover.
+  Tuning: changes should go through change management; correlate alerts with approved change tickets.
+severity: High
+requiredDataConnectors:
+  - connectorId: AzureActiveDirectory
+    dataTypes:
+      - AuditLogs
+queryFrequency: 1h
+queryPeriod: 1h
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - DefenseEvasion
+relevantTechniques:
+  - T1556.009
+query: |
+  AuditLogs
+  | where TimeGenerated > ago(1h)
+  | where OperationName in ("Delete conditional access policy", "Update conditional access policy") and Result =~ "success"
+  | extend PolicyName = tostring(TargetResources[0].displayName),
+      NewValue = tostring(TargetResources[0].modifiedProperties[0].newValue),
+      OldValue = tostring(TargetResources[0].modifiedProperties[0].oldValue)
+  | extend NewState = extract(@'"state"\s*:\s*"(\w+)"', 1, NewValue), OldState = extract(@'"state"\s*:\s*"(\w+)"', 1, OldValue)
+  | where OperationName == "Delete conditional access policy"
+      or (OldState == "enabled" and NewState in ("disabled", "enabledForReportingButNotEnforced"))
+  | extend Change = iff(OperationName startswith "Delete", "Deleted", strcat(OldState, " -> ", NewState)),
+      Actor = coalesce(tostring(InitiatedBy.user.userPrincipalName), tostring(InitiatedBy.app.displayName)),
+      ActorIP = tostring(InitiatedBy.user.ipAddress)
+  | project TimeGenerated, PolicyName, Change, Actor, ActorIP
+entityMappings:
+  - entityType: Account
+    fieldMappings:
+      - identifier: FullName
+        columnName: Actor
+version: 1.0.0
+kind: Scheduled

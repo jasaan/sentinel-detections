@@ -1,0 +1,13 @@
+rule: hunting/hunt-oauth-mail-permissions.yaml
+description: An app consented to with mail scopes by two users is listed once with both; an app with calendar-only scopes isn't.
+data:
+  AuditLogs:
+    - {ago: 10d, OperationName: Consent to application, Result: success, InitiatedBy: {user: {userPrincipalName: alice@contoso.com}}, TargetResources: [{displayName: Mail Helper Pro, id: app-10, modifiedProperties: [{displayName: ConsentAction.Permissions, newValue: "[] => [[Scope:  Mail.Read User.Read, ]]"}]}]}
+    - {ago: 4d, OperationName: Consent to application, Result: success, InitiatedBy: {user: {userPrincipalName: bob@contoso.com}}, TargetResources: [{displayName: Mail Helper Pro, id: app-10, modifiedProperties: [{displayName: ConsentAction.Permissions, newValue: "[] => [[Scope:  Mail.ReadWrite, ]]"}]}]}
+    - {ago: 4d, OperationName: Consent to application, Result: success, InitiatedBy: {user: {userPrincipalName: carol@contoso.com}}, TargetResources: [{displayName: Calendar Sync, id: app-11, modifiedProperties: [{displayName: ConsentAction.Permissions, newValue: "[] => [[Scope:  Calendars.Read, ]]"}]}]}
+expect:
+  rows: 1
+  include:
+    - {AppName: Mail Helper Pro, Consents: 2}
+  exclude:
+    - {AppName: Calendar Sync}

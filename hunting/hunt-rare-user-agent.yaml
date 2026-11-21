@@ -1,0 +1,26 @@
+id: de4de3e0-7860-5000-b4e6-3ee5454c79d9
+name: Successful sign-ins with rarely seen user agents
+description: |
+  Attack tools and scripts (python-requests, curl, unusual browsers) often show up as user agents almost never seen in
+  your tenant. Lists successful sign-ins in the last day whose user agent appeared three or fewer times in 30 days.
+  How to hunt: script-like agents on interactive user accounts are the top priority; then agents tied to a single user
+  from a new IP.
+requiredDataConnectors:
+  - connectorId: AzureActiveDirectory
+    dataTypes:
+      - SigninLogs
+tactics:
+  - InitialAccess
+  - DefenseEvasion
+relevantTechniques:
+  - T1078.004
+query: |
+  let maxSeen = 3;
+  let AgentCounts = SigninLogs
+      | where TimeGenerated > ago(30d) and ResultType == "0"
+      | summarize TimesSeen = count(), UsersWithAgent = dcount(UserPrincipalName) by UserAgent;
+  SigninLogs
+  | where TimeGenerated > ago(1d) and ResultType == "0"
+  | join kind=inner (AgentCounts | where TimesSeen <= maxSeen) on UserAgent
+  | project TimeGenerated, UserPrincipalName, UserAgent, TimesSeen, UsersWithAgent, IPAddress, Location, AppDisplayName
+  | order by TimesSeen asc, TimeGenerated desc

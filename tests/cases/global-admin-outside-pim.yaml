@@ -1,0 +1,44 @@
+rule: detections/global-admin-outside-pim.yaml
+description: A direct Global Administrator assignment fires; PIM activations, PIM-initiated adds and non-privileged roles don't.
+data:
+  AuditLogs:
+    - ago: 20m
+      OperationName: Add member to role
+      Result: success
+      InitiatedBy: {user: {userPrincipalName: mallory@contoso.com, ipAddress: 198.51.100.99}}
+      TargetResources:
+        - userPrincipalName: mallory.backup@contoso.com
+          modifiedProperties:
+            - {displayName: Role.DisplayName, oldValue: "", newValue: '"Global Administrator"'}
+    - ago: 20m
+      OperationName: Add member to role completed (PIM activation)
+      Result: success
+      InitiatedBy: {app: {displayName: MS-PIM}}
+      TargetResources:
+        - userPrincipalName: alice@contoso.com
+          modifiedProperties:
+            - {displayName: Role.DisplayName, oldValue: "", newValue: '"Global Administrator"'}
+    - ago: 20m
+      OperationName: Add member to role
+      Result: success
+      InitiatedBy: {app: {displayName: MS-PIM}}
+      TargetResources:
+        - userPrincipalName: bob@contoso.com
+          modifiedProperties:
+            - {displayName: Role.DisplayName, oldValue: "", newValue: '"Global Administrator"'}
+    - ago: 20m
+      OperationName: Add member to role
+      Result: success
+      InitiatedBy: {user: {userPrincipalName: helpdesk@contoso.com, ipAddress: 10.0.0.30}}
+      TargetResources:
+        - userPrincipalName: carol@contoso.com
+          modifiedProperties:
+            - {displayName: Role.DisplayName, oldValue: "", newValue: '"Reports Reader"'}
+expect:
+  rows: 1
+  include:
+    - {TargetUser: mallory.backup@contoso.com, RoleName: Global Administrator, Actor: mallory@contoso.com}
+  exclude:
+    - {TargetUser: alice@contoso.com}
+    - {TargetUser: bob@contoso.com}
+    - {TargetUser: carol@contoso.com}

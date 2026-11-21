@@ -1,0 +1,36 @@
+id: 23a4fdd9-b017-5e71-97f0-67af2d672702
+name: Mass file download from SharePoint or OneDrive
+description: |
+  A single account downloading hundreds of distinct files in an hour can mean data theft by an attacker or a departing
+  employee.
+  Tuning: set the threshold above normal sync behavior for your users; exclude backup and migration service accounts.
+  Pair with your offboarding list for insider-risk cases.
+severity: Medium
+requiredDataConnectors:
+  - connectorId: Office365
+    dataTypes:
+      - OfficeActivity
+queryFrequency: 1h
+queryPeriod: 1h
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - Collection
+  - Exfiltration
+relevantTechniques:
+  - T1530
+query: |
+  let threshold = 200;
+  OfficeActivity
+  | where TimeGenerated > ago(1h)
+  | where OfficeWorkload in ("SharePoint", "OneDrive") and Operation in ("FileDownloaded", "FileSyncDownloadedFull")
+  | summarize FilesDownloaded = dcount(SourceFileName), Sites = make_set(Site_Url, 10), ClientIPs = make_set(ClientIP, 10),
+      FirstSeen = min(TimeGenerated), LastSeen = max(TimeGenerated) by UserId
+  | where FilesDownloaded >= threshold
+entityMappings:
+  - entityType: Account
+    fieldMappings:
+      - identifier: FullName
+        columnName: UserId
+version: 1.0.0
+kind: Scheduled

@@ -1,0 +1,20 @@
+rule: detections/mfa-method-added-new-country.yaml
+description: New MFA method then a sign-in from a never-seen country fires; known-country sign-ins and sign-ins without a registration don't.
+data:
+  SigninLogs:
+    - {ago: 5d, UserPrincipalName: alice@contoso.com, ResultType: "0", Location: US, IPAddress: 203.0.113.30}
+    - {ago: 3d, UserPrincipalName: alice@contoso.com, ResultType: "0", Location: US, IPAddress: 203.0.113.30}
+    - {ago: 30m, UserPrincipalName: Alice@contoso.com, ResultType: "0", Location: NG, IPAddress: 198.51.100.150, AppDisplayName: Office 365 Exchange Online}
+    - {ago: 4d, UserPrincipalName: bob@contoso.com, ResultType: "0", Location: US, IPAddress: 203.0.113.31}
+    - {ago: 30m, UserPrincipalName: bob@contoso.com, ResultType: "0", Location: US, IPAddress: 203.0.113.31}
+    - {ago: 30m, UserPrincipalName: carol@contoso.com, ResultType: "0", Location: FR, IPAddress: 198.51.100.151}
+  AuditLogs:
+    - {ago: 50m, OperationName: User registered security info, Result: success, Category: UserManagement, TargetResources: [{userPrincipalName: alice@contoso.com}]}
+    - {ago: 50m, OperationName: User registered security info, Result: success, Category: UserManagement, TargetResources: [{userPrincipalName: bob@contoso.com}]}
+expect:
+  rows: 1
+  include:
+    - {UserPrincipalName: alice@contoso.com, Location: NG}
+  exclude:
+    - {UserPrincipalName: bob@contoso.com}
+    - {UserPrincipalName: carol@contoso.com}

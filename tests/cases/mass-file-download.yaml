@@ -1,0 +1,14 @@
+rule: detections/mass-file-download.yaml
+description: 210 distinct files in an hour fires; 50 files doesn't; repeated downloads of one file don't count as many.
+data:
+  OfficeActivity:
+    - {ago: 30m, _repeat: 210, OfficeWorkload: SharePoint, Operation: FileDownloaded, UserId: alice@contoso.com, ClientIP: 198.51.100.80, SourceFileName: "contract-{i}.pdf", Site_Url: "https://contoso.sharepoint.com/sites/legal/"}
+    - {ago: 30m, _repeat: 50, OfficeWorkload: OneDrive, Operation: FileDownloaded, UserId: bob@contoso.com, ClientIP: 10.0.0.50, SourceFileName: "notes-{i}.docx", Site_Url: "https://contoso-my.sharepoint.com/personal/bob/"}
+    - {ago: 30m, _repeat: 300, OfficeWorkload: SharePoint, Operation: FileDownloaded, UserId: carol@contoso.com, ClientIP: 10.0.0.51, SourceFileName: "dashboard.xlsx", Site_Url: "https://contoso.sharepoint.com/sites/finance/"}
+expect:
+  rows: 1
+  include:
+    - {UserId: alice@contoso.com, FilesDownloaded: 210}
+  exclude:
+    - {UserId: bob@contoso.com}
+    - {UserId: carol@contoso.com}

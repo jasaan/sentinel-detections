@@ -1,0 +1,39 @@
+rule: detections/oauth-high-risk-consent.yaml
+description: Consent including mail scopes fires; consent to basic sign-in scopes doesn't; failed consent doesn't.
+data:
+  AuditLogs:
+    - ago: 10m
+      OperationName: Consent to application
+      Result: success
+      InitiatedBy: {user: {userPrincipalName: alice@contoso.com, ipAddress: 198.51.100.7}}
+      TargetResources:
+        - displayName: Mail Helper Pro
+          id: aaaaaaaa-0000-0000-0000-000000000001
+          modifiedProperties:
+            - {displayName: ConsentContext.IsAdminConsent, oldValue: "", newValue: '"False"'}
+            - {displayName: ConsentAction.Permissions, oldValue: "", newValue: "[] => [[Id: x1, ClientId: aaaaaaaa-0000-0000-0000-000000000001, ConsentType: Principal, Scope:  Mail.Read Mail.Send User.Read offline_access, ]]"}
+    - ago: 10m
+      OperationName: Consent to application
+      Result: success
+      InitiatedBy: {user: {userPrincipalName: bob@contoso.com, ipAddress: 10.0.0.12}}
+      TargetResources:
+        - displayName: Team Polls
+          id: aaaaaaaa-0000-0000-0000-000000000002
+          modifiedProperties:
+            - {displayName: ConsentAction.Permissions, oldValue: "", newValue: "[] => [[Id: x2, ClientId: aaaaaaaa-0000-0000-0000-000000000002, ConsentType: Principal, Scope:  User.Read openid profile, ]]"}
+    - ago: 10m
+      OperationName: Consent to application
+      Result: failure
+      InitiatedBy: {user: {userPrincipalName: carol@contoso.com, ipAddress: 10.0.0.13}}
+      TargetResources:
+        - displayName: Shady Mail App
+          id: aaaaaaaa-0000-0000-0000-000000000003
+          modifiedProperties:
+            - {displayName: ConsentAction.Permissions, oldValue: "", newValue: "[] => [[Scope:  Mail.ReadWrite, ]]"}
+expect:
+  rows: 1
+  include:
+    - {AppName: Mail Helper Pro, ConsentedBy: alice@contoso.com}
+  exclude:
+    - {AppName: Team Polls}
+    - {AppName: Shady Mail App}

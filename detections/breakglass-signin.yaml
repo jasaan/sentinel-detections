@@ -1,0 +1,39 @@
+id: 27b0f511-be21-53b3-9850-bc133babdb28
+name: Break-glass account sign-in attempt
+description: |
+  Emergency-access ("break-glass") accounts exist for when normal admin access fails. They should almost never be used,
+  so any sign-in attempt, successful or not, needs an immediate human look.
+  Tuning: replace the BreakGlassAccounts list with your accounts, or with a Sentinel watchlist
+  (_GetWatchlist('BreakGlassAccounts') | project SearchKey). Expected volume is near zero; every alert is worth a call.
+severity: High
+requiredDataConnectors:
+  - connectorId: AzureActiveDirectory
+    dataTypes:
+      - SigninLogs
+queryFrequency: 15m
+queryPeriod: 15m
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - InitialAccess
+  - PrivilegeEscalation
+relevantTechniques:
+  - T1078.004
+query: |
+  let BreakGlassAccounts = dynamic(["breakglass1@contoso.com", "breakglass2@contoso.com"]);
+  SigninLogs
+  | where TimeGenerated > ago(15m)
+  | where UserPrincipalName in~ (BreakGlassAccounts)
+  | extend Outcome = iff(ResultType == "0", "Success", "Failure")
+  | project TimeGenerated, UserPrincipalName, Outcome, ResultType, ResultDescription, IPAddress, Location, AppDisplayName, UserAgent
+entityMappings:
+  - entityType: Account
+    fieldMappings:
+      - identifier: FullName
+        columnName: UserPrincipalName
+  - entityType: IP
+    fieldMappings:
+      - identifier: Address
+        columnName: IPAddress
+version: 1.0.0
+kind: Scheduled

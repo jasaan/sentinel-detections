@@ -1,0 +1,30 @@
+id: a825e6de-2d5d-5cac-b011-308123ba624e
+name: Dormant account signs in again
+description: |
+  Accounts that haven't been used for a month or more are favorite targets: nobody notices when they come back to life.
+  This lists successful sign-ins in the last day by accounts whose previous successful sign-in was more than 30 days ago.
+  How to hunt: check each against HR records (leave, departures) and the account owner. Former employees and service
+  accounts are the high-priority cases.
+requiredDataConnectors:
+  - connectorId: AzureActiveDirectory
+    dataTypes:
+      - SigninLogs
+tactics:
+  - InitialAccess
+  - Persistence
+relevantTechniques:
+  - T1078.004
+query: |
+  let dormancy = 30d;
+  let Recent = SigninLogs
+      | where TimeGenerated > ago(1d) and ResultType == "0"
+      | summarize ReturnedAt = min(TimeGenerated), IPs = make_set(IPAddress, 10), Countries = make_set(Location, 10) by UserPrincipalName;
+  let Previous = SigninLogs
+      | where TimeGenerated between (ago(90d) .. ago(1d)) and ResultType == "0"
+      | summarize LastSeenBefore = max(TimeGenerated) by UserPrincipalName;
+  Recent
+  | join kind=inner Previous on UserPrincipalName
+  | where ReturnedAt - LastSeenBefore > dormancy
+  | extend DaysDormant = datetime_diff("day", ReturnedAt, LastSeenBefore)
+  | project UserPrincipalName, DaysDormant, LastSeenBefore, ReturnedAt, IPs, Countries
+  | order by DaysDormant desc

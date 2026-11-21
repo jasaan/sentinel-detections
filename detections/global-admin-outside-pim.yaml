@@ -1,0 +1,47 @@
+id: ae5017fe-8218-561d-a06b-6a7633407b35
+name: Privileged Entra role assigned outside PIM
+description: |
+  When privileged roles are managed through Privileged Identity Management (PIM), a direct, permanent assignment of
+  Global Administrator or a similar role bypasses approval and time limits. Attackers do this to keep access.
+  Tuning: PIM activations log a different operation ("Add member to role completed (PIM activation)") and are not
+  matched. Add any break-glass provisioning account to an allow list only after review.
+severity: High
+requiredDataConnectors:
+  - connectorId: AzureActiveDirectory
+    dataTypes:
+      - AuditLogs
+queryFrequency: 1h
+queryPeriod: 1h
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - Persistence
+  - PrivilegeEscalation
+relevantTechniques:
+  - T1098.003
+query: |
+  let PrivilegedRoles = dynamic(["Global Administrator", "Privileged Role Administrator", "Privileged Authentication Administrator",
+      "Security Administrator", "Exchange Administrator", "Application Administrator"]);
+  AuditLogs
+  | where TimeGenerated > ago(1h)
+  | where OperationName == "Add member to role" and Result =~ "success"
+  | mv-apply Prop = TargetResources[0].modifiedProperties on (
+      where tostring(Prop.displayName) == "Role.DisplayName"
+      | extend RoleName = trim(@'"', tostring(Prop.newValue))
+    )
+  | where RoleName in (PrivilegedRoles)
+  | extend Actor = coalesce(tostring(InitiatedBy.user.userPrincipalName), tostring(InitiatedBy.app.displayName)),
+      ActorIP = tostring(InitiatedBy.user.ipAddress), TargetUser = tostring(TargetResources[0].userPrincipalName)
+  | where Actor !startswith "MS-PIM"
+  | project TimeGenerated, RoleName, TargetUser, Actor, ActorIP
+entityMappings:
+  - entityType: Account
+    fieldMappings:
+      - identifier: FullName
+        columnName: TargetUser
+  - entityType: Account
+    fieldMappings:
+      - identifier: FullName
+        columnName: Actor
+version: 1.0.0
+kind: Scheduled

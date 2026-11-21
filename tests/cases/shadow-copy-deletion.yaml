@@ -1,0 +1,15 @@
+rule: detections/shadow-copy-deletion.yaml
+description: Shadow-copy deletion and disabling recovery fire; listing shadow copies doesn't.
+data:
+  DeviceProcessEvents:
+    - {ago: 5m, DeviceName: fin-ws-07, AccountName: svc-backup, FileName: vssadmin.exe, ProcessCommandLine: "vssadmin.exe delete shadows /all /quiet", InitiatingProcessFileName: cmd.exe}
+    - {ago: 5m, DeviceName: fin-ws-07, AccountName: svc-backup, FileName: bcdedit.exe, ProcessCommandLine: "bcdedit.exe /set {default} recoveryenabled No", InitiatingProcessFileName: cmd.exe}
+    - {ago: 5m, DeviceName: it-ws-01, AccountName: alice, FileName: vssadmin.exe, ProcessCommandLine: "vssadmin.exe list shadows", InitiatingProcessFileName: powershell.exe}
+    - {ago: 5m, DeviceName: it-ws-01, AccountName: alice, FileName: wmic.exe, ProcessCommandLine: "wmic shadowcopy list brief", InitiatingProcessFileName: cmd.exe}
+expect:
+  rows: 2
+  include:
+    - {DeviceName: fin-ws-07, FileName: vssadmin.exe}
+    - {DeviceName: fin-ws-07, FileName: bcdedit.exe}
+  exclude:
+    - {DeviceName: it-ws-01}

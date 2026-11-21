@@ -1,0 +1,48 @@
+id: cbcf4a41-0807-5a76-9676-dcbf078e87ad
+name: Consent granted to an app with high-risk permissions
+description: |
+  Consent phishing tricks a user or admin into granting an app broad access (mail, files, directory). The app then reads
+  data without needing a password or MFA.
+  Tuning: adjust HighRiskScopes to your policy. Known business apps can be excluded by AppId after review; better still,
+  restrict user consent in Entra ID so this rule mostly fires on admin consent.
+severity: High
+requiredDataConnectors:
+  - connectorId: AzureActiveDirectory
+    dataTypes:
+      - AuditLogs
+queryFrequency: 1h
+queryPeriod: 1h
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - CredentialAccess
+  - Persistence
+relevantTechniques:
+  - T1528
+query: |
+  let HighRiskScopes = dynamic(["Mail.Read", "Mail.ReadWrite", "Mail.Send", "MailboxSettings.ReadWrite",
+      "Files.ReadWrite.All", "Sites.ReadWrite.All", "Directory.ReadWrite.All", "User.ReadWrite.All",
+      "Application.ReadWrite.All", "RoleManagement.ReadWrite.Directory", "full_access_as_app"]);
+  AuditLogs
+  | where TimeGenerated > ago(1h)
+  | where OperationName == "Consent to application" and Result =~ "success"
+  | mv-apply Prop = TargetResources[0].modifiedProperties on (
+      where tostring(Prop.displayName) == "ConsentAction.Permissions"
+      | extend Permissions = tostring(Prop.newValue)
+    )
+  | extend RiskyScopes = set_intersect(HighRiskScopes, extract_all(@"([\w\.]+)", Permissions))
+  | where array_length(RiskyScopes) > 0
+  | extend AppName = tostring(TargetResources[0].displayName), AppId = tostring(TargetResources[0].id),
+      ConsentedBy = tostring(InitiatedBy.user.userPrincipalName), ConsentIP = tostring(InitiatedBy.user.ipAddress)
+  | project TimeGenerated, AppName, AppId, ConsentedBy, ConsentIP, RiskyScopes
+entityMappings:
+  - entityType: Account
+    fieldMappings:
+      - identifier: FullName
+        columnName: ConsentedBy
+  - entityType: CloudApplication
+    fieldMappings:
+      - identifier: Name
+        columnName: AppName
+version: 1.0.0
+kind: Scheduled

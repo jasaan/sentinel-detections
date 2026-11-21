@@ -1,0 +1,13 @@
+rule: hunting/hunt-rare-user-agent.yaml
+description: A python-requests sign-in seen once is listed; a common browser agent isn't.
+data:
+  SigninLogs:
+    - {ago: 3h, UserPrincipalName: alice@contoso.com, ResultType: "0", UserAgent: python-requests/2.31.0, IPAddress: 198.51.100.160, Location: US}
+    - {ago: 20d, _repeat: 10, _step: 1h, UserPrincipalName: "user{i}@contoso.com", ResultType: "0", UserAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/130.0", IPAddress: 203.0.113.70, Location: US}
+    - {ago: 2h, UserPrincipalName: bob@contoso.com, ResultType: "0", UserAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/130.0", IPAddress: 203.0.113.71, Location: US}
+expect:
+  rows: 1
+  include:
+    - {UserPrincipalName: alice@contoso.com, UserAgent: python-requests/2.31.0}
+  exclude:
+    - {UserPrincipalName: bob@contoso.com}

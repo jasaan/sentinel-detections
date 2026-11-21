@@ -1,0 +1,48 @@
+id: 230bb435-38c9-4239-9da7-a1a907917187
+name: Windows event log or audit policy cleared
+description: |
+  Clearing the Security log (event 1102), clearing logs with wevtutil or PowerShell, or wiping audit policy removes
+  evidence of what just happened. It's a late-stage step, usually right before or after the damage.
+  Seen in: ransomware operators and APT intrusions (Volt Typhoon, BlackCat).
+  Tuning: lab and image-build machines sometimes clear logs; exclude them by device name.
+  Triage: treat the host as compromised. Logs already forwarded to Sentinel are intact; review the hour before the
+  clear for what was being hidden.
+severity: High
+requiredDataConnectors:
+  - connectorId: MicrosoftThreatProtection
+    dataTypes:
+      - DeviceProcessEvents
+  - connectorId: SecurityEvents
+    dataTypes:
+      - SecurityEvent
+queryFrequency: 1h
+queryPeriod: 1h
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - DefenseEvasion
+relevantTechniques:
+  - T1070.001
+  - T1562.002
+query: |
+  union
+      (DeviceProcessEvents
+      | where TimeGenerated > ago(1h)
+      | where (FileName =~ "wevtutil.exe" and ProcessCommandLine matches regex @"(?i)\s(cl|clear-log)\s")
+          or ProcessCommandLine matches regex @"(?i)clear-eventlog|remove-eventlog|globalsession\.clearlog|auditpol(\.exe)?\s+/(clear|remove)"
+      | project TimeGenerated, HostName = DeviceName, Account = AccountName, Evidence = ProcessCommandLine, Source = "DeviceProcessEvents"),
+      (SecurityEvent
+      | where TimeGenerated > ago(1h)
+      | where EventID == 1102
+      | project TimeGenerated, HostName = Computer, Account = SubjectUserName, Evidence = "Security log cleared (event 1102)", Source = "SecurityEvent")
+entityMappings:
+  - entityType: Host
+    fieldMappings:
+      - identifier: HostName
+        columnName: HostName
+  - entityType: Account
+    fieldMappings:
+      - identifier: Name
+        columnName: Account
+version: 1.0.0
+kind: Scheduled

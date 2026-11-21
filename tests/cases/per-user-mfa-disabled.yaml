@@ -1,0 +1,12 @@
+rule: detections/per-user-mfa-disabled.yaml
+description: Disabling per-user MFA fires; enabling it doesn't.
+data:
+  AuditLogs:
+    - {ago: 10m, OperationName: Disable Strong Authentication, Result: success, Category: UserManagement, InitiatedBy: {user: {userPrincipalName: admin1@contoso.com, ipAddress: 198.51.100.31}}, TargetResources: [{userPrincipalName: cfo@contoso.com}]}
+    - {ago: 10m, OperationName: Enable Strong Authentication, Result: success, Category: UserManagement, InitiatedBy: {user: {userPrincipalName: admin1@contoso.com, ipAddress: 198.51.100.31}}, TargetResources: [{userPrincipalName: intern@contoso.com}]}
+expect:
+  rows: 1
+  include:
+    - {TargetUser: cfo@contoso.com}
+  exclude:
+    - {TargetUser: intern@contoso.com}

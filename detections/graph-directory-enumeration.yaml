@@ -1,0 +1,46 @@
+id: 87b1647e-0719-463b-87e8-819963a08f97
+name: Broad directory enumeration through Microsoft Graph
+description: |
+  Tools like AzureHound, ROADrecon and GraphRunner pull users, groups, roles, apps, devices and policies in quick
+  succession to map paths to Global Admin. Normal apps read one or two kinds of directory object; this rule flags one
+  identity reading six or more kinds with 100+ requests in an hour.
+  Seen in: post-compromise reconnaissance by Midnight Blizzard, Storm-0501 and red teams using AzureHound.
+  Tuning: identity governance, backup and CSPM tools enumerate the directory by design; exclude their AppIds. Requires
+  the Microsoft Graph activity logs diagnostic setting.
+  Triage: identify the user or app and the user agent. An unknown user agent (python-requests, Go-http-client) from a
+  user account is the strongest sign; revoke the user's sessions and check how they signed in.
+severity: Medium
+requiredDataConnectors:
+  - connectorId: MicrosoftGraphActivityLogs
+    dataTypes:
+      - MicrosoftGraphActivityLogs
+queryFrequency: 1h
+queryPeriod: 1h
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - Discovery
+relevantTechniques:
+  - T1087.004
+  - T1069.003
+  - T1526
+query: |
+  let DirectoryResources = dynamic(["users", "groups", "serviceprincipals", "applications", "directoryroles",
+      "rolemanagement", "devices", "organization", "policies", "oauth2permissiongrants", "domains", "identity",
+      "directoryobjects", "administrativeunits", "contacts", "groupsettings"]);
+  MicrosoftGraphActivityLogs
+  | where TimeGenerated > ago(1h)
+  | extend Resource = tolower(extract(@"(?i)graph\.microsoft\.com/(?:v1\.0|beta)/([^/?]+)", 1, RequestUri))
+  | where Resource in (DirectoryResources)
+  | extend Identity = iff(isnotempty(UserId), UserId, ServicePrincipalId), IdentityType = iff(isnotempty(UserId), "User", "ServicePrincipal")
+  | summarize Requests = count(), ResourceTypes = dcount(Resource), Resources = make_set(Resource), IPs = make_set(IPAddress, 10),
+      UserAgents = make_set(UserAgent, 5), AppIds = make_set(AppId, 5), FirstSeen = min(TimeGenerated), LastSeen = max(TimeGenerated)
+      by Identity, IdentityType
+  | where ResourceTypes >= 6 and Requests >= 100
+entityMappings:
+  - entityType: Account
+    fieldMappings:
+      - identifier: AadUserId
+        columnName: Identity
+version: 1.0.0
+kind: Scheduled

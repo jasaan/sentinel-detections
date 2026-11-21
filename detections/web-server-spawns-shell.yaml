@@ -1,0 +1,47 @@
+id: cc6a27af-ee44-4531-80f4-e8e069c5cc76
+name: Web server process starts a shell or reconnaissance command (possible web shell)
+description: |
+  IIS worker processes, Exchange's UM worker, Apache, nginx, PHP and Tomcat shouldn't start cmd, PowerShell, sh or
+  whoami. When they do, someone is usually running commands through a web shell planted via an exploited
+  vulnerability.
+  Seen in: ProxyLogon/ProxyShell exploitation of Exchange, MOVEit and other edge-application exploits, Hafnium and Volt
+  Typhoon.
+  Tuning: some legacy web apps shell out by design; allow-list the exact command line, not the parent.
+  Triage: find the web shell (recently written .aspx, .jsp or .php files in web roots), check the web logs for the
+  requests that triggered it, and patch the exploited application.
+severity: High
+requiredDataConnectors:
+  - connectorId: MicrosoftThreatProtection
+    dataTypes:
+      - DeviceProcessEvents
+queryFrequency: 1h
+queryPeriod: 1h
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - Persistence
+  - InitialAccess
+relevantTechniques:
+  - T1505.003
+  - T1190
+query: |
+  let WebServers = dynamic(["w3wp.exe", "httpd.exe", "nginx.exe", "php-cgi.exe", "tomcat.exe", "tomcat8.exe", "tomcat9.exe",
+      "umworkerprocess.exe", "httpd", "nginx", "apache2", "php-fpm", "lighttpd"]);
+  let SuspiciousChildren = dynamic(["cmd.exe", "powershell.exe", "pwsh.exe", "whoami.exe", "net.exe", "net1.exe", "certutil.exe",
+      "bitsadmin.exe", "rundll32.exe", "mshta.exe", "wscript.exe", "cscript.exe", "nltest.exe", "systeminfo.exe", "tasklist.exe",
+      "sh", "bash", "dash", "whoami", "id", "uname", "curl", "wget", "nc", "ncat", "python", "python3", "perl"]);
+  DeviceProcessEvents
+  | where TimeGenerated > ago(1h)
+  | where InitiatingProcessFileName in~ (WebServers) and FileName in~ (SuspiciousChildren)
+  | project TimeGenerated, DeviceName, AccountName, FileName, ProcessCommandLine, InitiatingProcessFileName, InitiatingProcessCommandLine
+entityMappings:
+  - entityType: Host
+    fieldMappings:
+      - identifier: HostName
+        columnName: DeviceName
+  - entityType: Account
+    fieldMappings:
+      - identifier: Name
+        columnName: AccountName
+version: 1.0.0
+kind: Scheduled

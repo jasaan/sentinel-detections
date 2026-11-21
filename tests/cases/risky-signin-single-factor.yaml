@@ -1,0 +1,14 @@
+rule: detections/risky-signin-single-factor.yaml
+description: A high-risk password-only sign-in fires; a high-risk sign-in with MFA and a low-risk password-only one don't.
+data:
+  SigninLogs:
+    - {ago: 10m, UserPrincipalName: alice@contoso.com, ResultType: "0", RiskLevelDuringSignIn: high, AuthenticationRequirement: singleFactorAuthentication, IPAddress: 198.51.100.5, Location: RO}
+    - {ago: 10m, UserPrincipalName: bob@contoso.com, ResultType: "0", RiskLevelDuringSignIn: high, AuthenticationRequirement: multiFactorAuthentication, IPAddress: 198.51.100.6, Location: RO}
+    - {ago: 10m, UserPrincipalName: carol@contoso.com, ResultType: "0", RiskLevelDuringSignIn: low, AuthenticationRequirement: singleFactorAuthentication, IPAddress: 203.0.113.7, Location: US}
+expect:
+  rows: 1
+  include:
+    - {UserPrincipalName: alice@contoso.com}
+  exclude:
+    - {UserPrincipalName: bob@contoso.com}
+    - {UserPrincipalName: carol@contoso.com}

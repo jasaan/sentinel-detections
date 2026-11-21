@@ -1,0 +1,49 @@
+id: 25f3a7dc-3d92-4499-bbfe-0b6090224efb
+name: Reverse shell command line on Linux
+description: |
+  A reverse shell connects out from the compromised host to the attacker and hands them an interactive shell. The
+  one-liners are distinctive: bash's /dev/tcp, netcat with -e, socat exec:, a named pipe piped into nc, or a Python,
+  Perl, PHP or Ruby socket that duplicates file descriptors.
+  Seen in: exploitation of internet-facing Linux services (Confluence, Log4Shell, Ivanti), and cryptomining campaigns.
+  Tuning: penetration tests produce these; nothing else should.
+  Triage: get the destination IP and port, isolate the host, find the parent process (often a web server or Java
+  service, which points to the exploited application) and look for persistence such as cron jobs or SSH keys.
+severity: High
+requiredDataConnectors:
+  - connectorId: MicrosoftThreatProtection
+    dataTypes:
+      - DeviceProcessEvents
+queryFrequency: 1h
+queryPeriod: 1h
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - Execution
+  - CommandAndControl
+relevantTechniques:
+  - T1059.004
+  - T1059.006
+query: |
+  DeviceProcessEvents
+  | where TimeGenerated > ago(1h)
+  | where ProcessCommandLine matches regex @"/dev/(tcp|udp)/[\w\.\-]+/\d+"
+      or ProcessCommandLine matches regex @"\b(nc|ncat|netcat|nc\.traditional)\b.*\s-(e|c)\s+\S*(sh|bash)\b"
+      or ProcessCommandLine matches regex @"\bncat\b.*--(exec|sh-exec)\b"
+      or ProcessCommandLine matches regex @"(?i)\bsocat\b.*\bexec:"
+      or ProcessCommandLine matches regex @"mkfifo\s+\S+.*\|\s*(nc|ncat|netcat|/bin/(ba)?sh)\b"
+      or ProcessCommandLine matches regex @"python[23]?(\.\d+)?\s+-c\s+.*socket.*(pty\.spawn|os\.dup2|subprocess)"
+      or ProcessCommandLine matches regex @"perl\s+-e\s+.*socket.*exec"
+      or ProcessCommandLine matches regex @"php\s+-r\s+.*fsockopen"
+      or ProcessCommandLine matches regex @"ruby\s+-rsocket"
+  | project TimeGenerated, DeviceName, AccountName, FileName, ProcessCommandLine, InitiatingProcessFileName, InitiatingProcessCommandLine
+entityMappings:
+  - entityType: Host
+    fieldMappings:
+      - identifier: HostName
+        columnName: DeviceName
+  - entityType: Account
+    fieldMappings:
+      - identifier: Name
+        columnName: AccountName
+version: 1.0.0
+kind: Scheduled

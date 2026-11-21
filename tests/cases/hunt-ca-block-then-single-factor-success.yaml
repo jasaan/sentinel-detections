@@ -1,0 +1,15 @@
+rule: hunting/hunt-ca-block-then-single-factor-success.yaml
+description: A CA block followed by a password-only success shows up; a block with no success and a success with no block don't.
+data:
+  SigninLogs:
+    - {ago: 5h, UserPrincipalName: alice@contoso.com, ResultType: "53003", ConditionalAccessStatus: failure, AuthenticationRequirement: singleFactorAuthentication, AppDisplayName: Office 365 Exchange Online, IPAddress: 198.51.100.161}
+    - {ago: 4h, UserPrincipalName: alice@contoso.com, ResultType: "0", ConditionalAccessStatus: notApplied, AuthenticationRequirement: singleFactorAuthentication, AppDisplayName: Windows Azure Service Management API, IPAddress: 198.51.100.161}
+    - {ago: 5h, UserPrincipalName: bob@contoso.com, ResultType: "53003", ConditionalAccessStatus: failure, AuthenticationRequirement: singleFactorAuthentication, AppDisplayName: Office 365 Exchange Online, IPAddress: 198.51.100.162}
+    - {ago: 4h, UserPrincipalName: carol@contoso.com, ResultType: "0", ConditionalAccessStatus: notApplied, AuthenticationRequirement: singleFactorAuthentication, AppDisplayName: My Apps, IPAddress: 203.0.113.161}
+expect:
+  rows: 1
+  include:
+    - {UserPrincipalName: alice@contoso.com}
+  exclude:
+    - {UserPrincipalName: bob@contoso.com}
+    - {UserPrincipalName: carol@contoso.com}

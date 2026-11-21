@@ -1,0 +1,14 @@
+rule: detections/run-key-persistence.yaml
+description: A Run value pointing into AppData\Roaming fires; OneDrive in AppData\Local and a System32 value don't.
+data:
+  DeviceRegistryEvents:
+    - {ago: 10m, DeviceName: fin-ws-07, ActionType: RegistryValueSet, RegistryKey: 'HKEY_CURRENT_USER\S-1-5-21-1-2-3-1104\SOFTWARE\Microsoft\Windows\CurrentVersion\Run', RegistryValueName: Updater, RegistryValueData: 'C:\Users\carol\AppData\Roaming\upd\svc.exe', InitiatingProcessFileName: svc.exe, InitiatingProcessAccountName: carol}
+    - {ago: 10m, DeviceName: it-ws-01, ActionType: RegistryValueSet, RegistryKey: 'HKEY_CURRENT_USER\S-1-5-21-1-2-3-1105\SOFTWARE\Microsoft\Windows\CurrentVersion\Run', RegistryValueName: OneDrive, RegistryValueData: '"C:\Users\alice\AppData\Local\Microsoft\OneDrive\OneDrive.exe" /background', InitiatingProcessFileName: OneDriveSetup.exe, InitiatingProcessAccountName: alice}
+    - {ago: 10m, DeviceName: it-ws-02, ActionType: RegistryValueSet, RegistryKey: 'HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Run', RegistryValueName: SecurityHealth, RegistryValueData: '%windir%\system32\SecurityHealthSystray.exe', InitiatingProcessFileName: TrustedInstaller.exe, InitiatingProcessAccountName: system}
+expect:
+  rows: 1
+  include:
+    - {DeviceName: fin-ws-07, RegistryValueName: Updater}
+  exclude:
+    - {DeviceName: it-ws-01}
+    - {DeviceName: it-ws-02}

@@ -1,0 +1,52 @@
+id: f1b19c8a-e66c-4a1f-87df-becc70d574df
+name: EBS, AMI or RDS snapshot shared with another account or made public
+description: |
+  Sharing a disk, image or database snapshot with an outside AWS account is a fast way to copy entire volumes or
+  databases out, and it doesn't create any data-transfer events in your account. Making a snapshot public exposes it to
+  everyone.
+  Seen in: documented AWS data-theft cases and Stratus Red Team's exfiltration techniques.
+  Tuning: list your own organization's account IDs in TrustedAccounts (backup and DR accounts in particular).
+  Triage: remove the share (modify the attribute with "remove"), check whether the other account copied it (you can't
+  see that directly; assume yes), and find out how the caller got permission.
+severity: High
+requiredDataConnectors:
+  - connectorId: AWS
+    dataTypes:
+      - AWSCloudTrail
+queryFrequency: 1h
+queryPeriod: 1h
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - Exfiltration
+relevantTechniques:
+  - T1537
+query: |
+  let TrustedAccounts = dynamic(["111111111111"]);
+  AWSCloudTrail
+  | where TimeGenerated > ago(1h)
+  | where EventName in ("ModifySnapshotAttribute", "ModifyImageAttribute", "ModifyDBSnapshotAttribute", "ModifyDBClusterSnapshotAttribute")
+  | where isempty(ErrorCode)
+  | extend P = parse_json(RequestParameters)
+  | extend AddList = case(
+      EventName == "ModifySnapshotAttribute", P.createVolumePermission.add.items,
+      EventName == "ModifyImageAttribute", P.launchPermission.add.items,
+      P.valuesToAdd)
+  | mv-expand Item = AddList
+  | extend SharedWith = iff(gettype(Item) == "dictionary", coalesce(tostring(Item.userId), tostring(Item.group)), tostring(Item))
+  | where isnotempty(SharedWith)
+  | where SharedWith =~ "all" or (SharedWith != RecipientAccountId and SharedWith !in (TrustedAccounts))
+  | extend Resource = coalesce(tostring(P.snapshotId), tostring(P.imageId), tostring(P.dBSnapshotIdentifier), tostring(P.dBClusterSnapshotIdentifier)),
+      Public = SharedWith =~ "all"
+  | project TimeGenerated, EventName, Resource, SharedWith, Public, UserIdentityArn, SourceIpAddress, RecipientAccountId
+entityMappings:
+  - entityType: Account
+    fieldMappings:
+      - identifier: Name
+        columnName: UserIdentityArn
+  - entityType: IP
+    fieldMappings:
+      - identifier: Address
+        columnName: SourceIpAddress
+version: 1.0.0
+kind: Scheduled

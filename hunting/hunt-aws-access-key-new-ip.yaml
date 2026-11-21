@@ -1,0 +1,32 @@
+id: ffe36e91-aa10-4e0b-bf6d-f15f47cc90e0
+name: AWS IAM user's access key used from a new IP
+description: |
+  Long-lived IAM access keys leak through code repositories, CI logs and laptops. When a key that normally runs from a
+  fixed set of IPs (a CI runner, an office) shows up somewhere new, it may be in someone else's hands. Only users with
+  at least one prior call in 30 days are included, so new users don't flood the results.
+  How to hunt: rank by Errors (stolen keys tend to hit AccessDenied while the attacker explores) and by unusual user
+  agents. Rotate any key you can't explain and move workloads to roles.
+requiredDataConnectors:
+  - connectorId: AWS
+    dataTypes:
+      - AWSCloudTrail
+tactics:
+  - InitialAccess
+  - CredentialAccess
+relevantTechniques:
+  - T1078.004
+  - T1552.001
+query: |
+  let History = AWSCloudTrail
+      | where TimeGenerated between (ago(30d) .. ago(1d))
+      | where UserIdentityType == "IAMUser";
+  let KnownPairs = History | distinct UserIdentityArn, SourceIpAddress;
+  let KnownUsers = History | distinct UserIdentityArn;
+  AWSCloudTrail
+  | where TimeGenerated > ago(1d)
+  | where UserIdentityType == "IAMUser" and SourceIpAddress !endswith "amazonaws.com"
+  | join kind=leftanti KnownPairs on UserIdentityArn, SourceIpAddress
+  | join kind=inner KnownUsers on UserIdentityArn
+  | summarize Calls = count(), Errors = countif(isnotempty(ErrorCode)), EventNames = make_set(EventName, 20), UserAgents = make_set(UserAgent, 5),
+      FirstSeen = min(TimeGenerated) by UserIdentityArn, SourceIpAddress
+  | order by Errors desc, Calls desc

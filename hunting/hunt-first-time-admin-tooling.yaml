@@ -1,0 +1,33 @@
+id: 6daf91a1-eff2-49b4-9446-938c45fdf3f4
+name: First use of Azure or Graph command-line tools by a user
+description: |
+  Azure PowerShell, Azure CLI, Graph Explorer and the Microsoft Graph PowerShell SDK are how attackers (and tools like
+  GraphRunner and ROADtools that impersonate them) query and change a tenant after taking over an account. This hunt
+  lists users who signed in to one of these apps today and hadn't in the previous 30 days.
+  How to hunt: expect admins and developers; focus on users outside IT, sign-ins from unfamiliar IPs, and users who
+  also show up in the Graph enumeration rule or the device code rule.
+requiredDataConnectors:
+  - connectorId: AzureActiveDirectory
+    dataTypes:
+      - SigninLogs
+tactics:
+  - Execution
+  - Discovery
+relevantTechniques:
+  - T1059.009
+  - T1087.004
+query: |
+  let AdminApps = dynamic(["Microsoft Azure PowerShell", "Microsoft Azure CLI", "Graph Explorer", "Microsoft Graph Command Line Tools",
+      "Azure Active Directory PowerShell", "Microsoft Exchange REST API Based Powershell", "Microsoft Intune PowerShell"]);
+  let Known = SigninLogs
+      | where TimeGenerated between (ago(30d) .. ago(1d))
+      | where AppDisplayName in (AdminApps)
+      | distinct UserPrincipalName = tolower(UserPrincipalName), AppDisplayName;
+  SigninLogs
+  | where TimeGenerated > ago(1d)
+  | where ResultType == "0" and AppDisplayName in (AdminApps)
+  | extend UserPrincipalName = tolower(UserPrincipalName)
+  | join kind=leftanti Known on UserPrincipalName, AppDisplayName
+  | summarize FirstSeen = min(TimeGenerated), SignIns = count(), IPs = make_set(IPAddress, 10), Locations = make_set(Location, 5)
+      by UserPrincipalName, AppDisplayName
+  | order by FirstSeen desc

@@ -1,0 +1,15 @@
+rule: detections/rmm-tool-first-seen.yaml
+description: AnyDesk appearing on a finance laptop fires; TeamViewer that ran there last week and an unrelated process don't.
+data:
+  DeviceProcessEvents:
+    - {ago: 20m, DeviceName: fin-ws-07, AccountName: carol, FileName: AnyDesk.exe, FolderPath: 'C:\Users\carol\Downloads\AnyDesk.exe', ProcessCommandLine: '"AnyDesk.exe"', InitiatingProcessFileName: explorer.exe}
+    - {ago: 5d, DeviceName: it-ws-01, AccountName: alice, FileName: TeamViewer.exe, FolderPath: 'C:\Program Files\TeamViewer\TeamViewer.exe', ProcessCommandLine: '"TeamViewer.exe"', InitiatingProcessFileName: explorer.exe}
+    - {ago: 20m, DeviceName: it-ws-01, AccountName: alice, FileName: TeamViewer.exe, FolderPath: 'C:\Program Files\TeamViewer\TeamViewer.exe', ProcessCommandLine: '"TeamViewer.exe"', InitiatingProcessFileName: explorer.exe}
+    - {ago: 20m, DeviceName: it-ws-02, AccountName: bob, FileName: notepad.exe, FolderPath: 'C:\Windows\System32\notepad.exe', ProcessCommandLine: notepad.exe, InitiatingProcessFileName: explorer.exe}
+expect:
+  rows: 1
+  include:
+    - {DeviceName: fin-ws-07, Tool: anydesk.exe}
+  exclude:
+    - {DeviceName: it-ws-01}
+    - {DeviceName: it-ws-02}

@@ -1,0 +1,35 @@
+id: 1937b47a-8a71-40b3-81d8-2cf4b8c54f0e
+name: Regular-interval connections to a public IP (C2 beaconing)
+description: |
+  Command-and-control implants check in on a timer (every 60 seconds plus a little jitter, for example). This hunt
+  finds process-to-destination pairs with 50+ connections in a day whose gaps between connections barely vary
+  (Jitter = standard deviation / mean of the interval, below 0.2).
+  How to hunt: start with the lowest Jitter and the least-known processes. Update agents, telemetry and NTP will show
+  up with near-zero jitter too; check the destination (RemoteUrl, WHOIS, threat intel) and the process path before
+  digging into the device.
+requiredDataConnectors:
+  - connectorId: MicrosoftThreatProtection
+    dataTypes:
+      - DeviceNetworkEvents
+tactics:
+  - CommandAndControl
+relevantTechniques:
+  - T1071.001
+  - T1573
+query: |
+  DeviceNetworkEvents
+  | where TimeGenerated > ago(1d)
+  | where ActionType == "ConnectionSuccess" and isnotempty(RemoteIP) and not(ipv4_is_private(RemoteIP))
+  | project TimeGenerated, DeviceName, InitiatingProcessFileName, RemoteIP, RemoteUrl, RemotePort
+  | sort by DeviceName asc, InitiatingProcessFileName asc, RemoteIP asc, RemotePort asc, TimeGenerated asc
+  | extend SameFlow = DeviceName == prev(DeviceName) and InitiatingProcessFileName == prev(InitiatingProcessFileName)
+      and RemoteIP == prev(RemoteIP) and RemotePort == prev(RemotePort)
+  | extend Gap = iff(SameFlow, datetime_diff("second", TimeGenerated, prev(TimeGenerated)), long(null))
+  | where isnotnull(Gap)
+  | summarize Connections = count() + 1, AvgGapSeconds = avg(Gap), StdevGap = stdev(Gap), FirstSeen = min(TimeGenerated),
+      LastSeen = max(TimeGenerated), RemoteUrl = take_any(RemoteUrl)
+      by DeviceName, InitiatingProcessFileName, RemoteIP, RemotePort
+  | where Connections >= 50 and AvgGapSeconds >= 10
+  | extend Jitter = round(StdevGap / AvgGapSeconds, 3)
+  | where Jitter < 0.2
+  | order by Jitter asc, Connections desc

@@ -1,0 +1,56 @@
+id: 52df6560-990a-4fd0-b024-2322d852a8f7
+name: Inbox rule hides mail about payments or security
+description: |
+  After taking over a mailbox, business email compromise (BEC) actors add a rule that deletes or buries replies about
+  invoices, wire transfers or "was this you?" security warnings, so the real owner doesn't notice the fraud in progress.
+  The rule names are often just "." or "..". This complements the external-forwarding rule, which covers rules that
+  send mail out.
+  Seen in: most BEC and AiTM follow-on activity documented by Microsoft and the FBI IC3.
+  Tuning: add finance or security words your users really use to the keyword list; rules that file vendor invoices into a
+  normal folder don't match because they don't hide mail.
+  Triage: look at the rule (Get-InboxRule -Mailbox <user>), check the sign-in that created it (ClientIP), and if it
+  isn't the user's, remove the rule, revoke sessions and find the messages the rule hid.
+severity: High
+requiredDataConnectors:
+  - connectorId: Office365
+    dataTypes:
+      - OfficeActivity
+queryFrequency: 1h
+queryPeriod: 1h
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - DefenseEvasion
+  - Collection
+relevantTechniques:
+  - T1564.008
+  - T1114.002
+query: |
+  let Keywords = dynamic(["invoice", "invoices", "payment", "payments", "wire", "bank", "banking", "transfer", "remittance",
+      "payroll", "deposit", "ach", "password", "phish", "phishing", "hack", "hacked", "compromised", "suspicious", "fraud",
+      "mfa", "helpdesk", "verify", "unusual"]);
+  OfficeActivity
+  | where TimeGenerated > ago(1h)
+  | where Operation in~ ("New-InboxRule", "Set-InboxRule")
+  | mv-apply P = todynamic(Parameters) on (
+      summarize Params = make_bag(bag_pack(tostring(P.Name), tostring(P.Value)))
+    )
+  | extend RuleName = tostring(Params.Name), MoveTo = tostring(Params.MoveToFolder),
+      Deletes = tostring(Params.DeleteMessage) =~ "True" or tostring(Params.SoftDeleteMessage) =~ "True",
+      Words = tolower(strcat(tostring(Params.SubjectContainsWords), ";", tostring(Params.BodyContainsWords), ";",
+          tostring(Params.SubjectOrBodyContainsWords), ";", tostring(Params.FromAddressContainsWords)))
+  | extend HidesMail = Deletes or MoveTo matches regex @"(?i)rss|archive|conversation history|junk|deleted items"
+  | extend KeywordMatch = Words has_any (Keywords), OddName = strlen(trim(@"[\s\.\,\-_']+", RuleName)) == 0
+  | where HidesMail and (KeywordMatch or OddName)
+  | project TimeGenerated, UserId, ClientIP, Operation, RuleName, MoveTo, Deletes, Words, Parameters
+entityMappings:
+  - entityType: Account
+    fieldMappings:
+      - identifier: FullName
+        columnName: UserId
+  - entityType: IP
+    fieldMappings:
+      - identifier: Address
+        columnName: ClientIP
+version: 1.0.0
+kind: Scheduled

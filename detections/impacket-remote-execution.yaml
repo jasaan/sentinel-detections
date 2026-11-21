@@ -1,0 +1,45 @@
+id: 0610a181-e8aa-4f39-8434-5cdc13324e2c
+name: Impacket-style remote execution (wmiexec, smbexec, DCOM)
+description: |
+  Impacket's wmiexec and smbexec run commands on remote hosts and write the output to a file on the ADMIN$ or C$ share
+  (\\127.0.0.1\ADMIN$\__<timestamp>), which leaves a very recognizable command line. DCOM execution through MMC20 shows
+  up as mmc.exe -Embedding starting a shell.
+  Seen in: ransomware affiliates, Volt Typhoon and most red teams; Impacket is the standard lateral movement toolkit.
+  Tuning: no legitimate software writes output this way; expect zero false positives outside pentests.
+  Triage: identify the source host from DeviceLogonEvents (network logon just before), the account used, and contain
+  both ends. Reset the account's password.
+severity: High
+requiredDataConnectors:
+  - connectorId: MicrosoftThreatProtection
+    dataTypes:
+      - DeviceProcessEvents
+queryFrequency: 1h
+queryPeriod: 1h
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - LateralMovement
+  - Execution
+relevantTechniques:
+  - T1021.002
+  - T1021.003
+  - T1047
+query: |
+  DeviceProcessEvents
+  | where TimeGenerated > ago(1h)
+  | where (FileName =~ "cmd.exe" and ProcessCommandLine matches regex @"(?i)/q\s+/c\s.*\\\\127\.0\.0\.1\\(admin|c)\$\\__")
+      or (InitiatingProcessFileName =~ "mmc.exe" and InitiatingProcessCommandLine has "-Embedding" and FileName in~ ("cmd.exe", "powershell.exe", "pwsh.exe"))
+  | extend Method = case(InitiatingProcessFileName =~ "wmiprvse.exe", "wmiexec", InitiatingProcessFileName =~ "services.exe", "smbexec",
+      InitiatingProcessFileName =~ "mmc.exe", "dcomexec", "other")
+  | project TimeGenerated, DeviceName, AccountName, Method, ProcessCommandLine, InitiatingProcessFileName, InitiatingProcessCommandLine
+entityMappings:
+  - entityType: Host
+    fieldMappings:
+      - identifier: HostName
+        columnName: DeviceName
+  - entityType: Account
+    fieldMappings:
+      - identifier: Name
+        columnName: AccountName
+version: 1.0.0
+kind: Scheduled

@@ -1,0 +1,55 @@
+id: fa8fb6c2-4800-4a3c-b99a-dc41caba5630
+name: AWS administrator-level policy attached or written
+description: |
+  Attaching the AdministratorAccess managed policy, or writing an inline or custom policy that allows "*" on "*",
+  turns a limited identity into a full admin. This is the most common privilege-escalation end state in AWS.
+  Seen in: Pacu and Stratus Red Team privilege-escalation modules, and many AWS incident write-ups.
+  Tuning: account bootstrapping and break-glass roles are expected; scope them out by role name. Prefer IAM Identity
+  Center permission sets so direct attachments are rare enough to review each one.
+  Triage: identify the target user, role or group and who made the change, detach the policy if it isn't approved, and
+  review the target's activity since.
+severity: High
+requiredDataConnectors:
+  - connectorId: AWS
+    dataTypes:
+      - AWSCloudTrail
+queryFrequency: 1h
+queryPeriod: 1h
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - PrivilegeEscalation
+  - Persistence
+relevantTechniques:
+  - T1098.003
+query: |
+  let Managed = AWSCloudTrail
+      | where TimeGenerated > ago(1h)
+      | where EventName in ("AttachUserPolicy", "AttachRolePolicy", "AttachGroupPolicy") and isempty(ErrorCode)
+      | where RequestParameters contains "arn:aws:iam::aws:policy/AdministratorAccess"
+      | extend Grant = "AdministratorAccess managed policy";
+  let Inline = AWSCloudTrail
+      | where TimeGenerated > ago(1h)
+      | where EventName in ("PutUserPolicy", "PutRolePolicy", "PutGroupPolicy", "CreatePolicy", "CreatePolicyVersion") and isempty(ErrorCode)
+      | extend Doc = parse_json(tostring(parse_json(RequestParameters).policyDocument))
+      | mv-expand Statement = iff(gettype(Doc.Statement) == "array", Doc.Statement, pack_array(Doc.Statement))
+      | where tostring(Statement.Effect) == "Allow"
+      | where tostring(Statement.Action) == "*" or tostring(Statement.Action) contains '"*"'
+      | where tostring(Statement.Resource) == "*" or tostring(Statement.Resource) contains '"*"'
+      | extend Grant = "Policy allowing * on *"
+      | project-away Doc, Statement;
+  union Managed, Inline
+  | extend P = parse_json(RequestParameters)
+  | extend Target = coalesce(tostring(P.userName), tostring(P.roleName), tostring(P.groupName), tostring(P.policyName), tostring(P.policyArn))
+  | summarize FirstSeen = min(TimeGenerated) by EventName, Grant, Target, UserIdentityArn, SourceIpAddress, RecipientAccountId
+entityMappings:
+  - entityType: Account
+    fieldMappings:
+      - identifier: Name
+        columnName: UserIdentityArn
+  - entityType: IP
+    fieldMappings:
+      - identifier: Address
+        columnName: SourceIpAddress
+version: 1.0.0
+kind: Scheduled

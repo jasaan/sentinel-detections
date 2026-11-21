@@ -1,0 +1,49 @@
+id: 464ccde4-6e5a-43f8-94bd-721ee08ed0bd
+name: User clicked a link in a delivered phishing email
+description: |
+  Defender for Office 365 classified the email as phishing but it still reached the inbox (policy gap, allow-list,
+  or a verdict that came after delivery), and the user clicked through. This is the moment to act, before the
+  credentials or session are used.
+  Tuning: requires Defender for Office 365 Plan 2 (EmailEvents and UrlClickEvents). Clicks blocked by Safe Links are
+  left out because they didn't reach the page.
+  Triage: reset the user's password and revoke sessions if the URL was a credential page; check sign-ins in the next
+  hour for a new IP or a new MFA method (see the AiTM and MFA-registration rules). Purge the email from all mailboxes.
+severity: High
+requiredDataConnectors:
+  - connectorId: MicrosoftThreatProtection
+    dataTypes:
+      - EmailEvents
+      - UrlClickEvents
+queryFrequency: 1h
+queryPeriod: 1d
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - InitialAccess
+  - Execution
+relevantTechniques:
+  - T1566.002
+  - T1204.001
+query: |
+  let Phish = EmailEvents
+      | where TimeGenerated > ago(1d)
+      | where ThreatTypes has "Phish" and DeliveryAction =~ "Delivered"
+      | project NetworkMessageId, RecipientEmailAddress = tolower(RecipientEmailAddress), SenderFromAddress, Subject, DeliveryLocation;
+  UrlClickEvents
+  | where TimeGenerated > ago(1h)
+  | where ActionType =~ "ClickAllowed" or IsClickedThrough == true
+  | extend AccountUpn = tolower(AccountUpn)
+  | join kind=inner Phish on NetworkMessageId, $left.AccountUpn == $right.RecipientEmailAddress
+  | summarize FirstClick = min(TimeGenerated), Urls = make_set(Url, 10), ClickIPs = make_set(IPAddress, 5)
+      by AccountUpn, NetworkMessageId, SenderFromAddress, Subject
+entityMappings:
+  - entityType: Account
+    fieldMappings:
+      - identifier: FullName
+        columnName: AccountUpn
+  - entityType: MailMessage
+    fieldMappings:
+      - identifier: NetworkMessageId
+        columnName: NetworkMessageId
+version: 1.0.0
+kind: Scheduled

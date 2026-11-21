@@ -1,0 +1,46 @@
+id: d1a18471-0e72-45bb-92e0-c08c2c189684
+name: Same sign-in session used from two countries (possible AiTM token theft)
+description: |
+  Adversary-in-the-middle (AiTM) phishing kits proxy the real Microsoft sign-in page, capture the session cookie after
+  the user completes MFA, and replay it from attacker infrastructure. The stolen session keeps its SessionId, so one
+  session showing up from two countries within two hours is a strong sign that the cookie is being used somewhere else.
+  Seen in: Storm-1167 and other AiTM phishing-as-a-service campaigns (EvilProxy, Tycoon 2FA).
+  Tuning: corporate VPNs and secure web gateways that egress in several countries cause false positives; exclude their
+  egress IPs. Requires the non-interactive sign-in logs to be connected.
+  Triage: compare the IPs with the user's usual ones. If one is unfamiliar, revoke sessions (Revoke-MgUserSignInSession),
+  reset the password, review MFA methods and inbox rules, and look for the phishing email that started it.
+severity: High
+requiredDataConnectors:
+  - connectorId: AzureActiveDirectory
+    dataTypes:
+      - SigninLogs
+      - AADNonInteractiveUserSignInLogs
+queryFrequency: 1h
+queryPeriod: 2h
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - CredentialAccess
+  - DefenseEvasion
+relevantTechniques:
+  - T1539
+  - T1550.004
+  - T1557
+query: |
+  union
+      (SigninLogs | where TimeGenerated > ago(2h) | extend SignInType = "Interactive"),
+      (AADNonInteractiveUserSignInLogs | where TimeGenerated > ago(2h) | extend SignInType = "NonInteractive")
+  | where ResultType == "0" and isnotempty(SessionId) and isnotempty(Location)
+  | summarize Countries = make_set(Location, 10), IPs = make_set(IPAddress, 20), Apps = make_set(AppDisplayName, 10),
+      SignInTypes = make_set(SignInType), FirstSeen = min(TimeGenerated), LastSeen = max(TimeGenerated)
+      by UserPrincipalName = tolower(UserPrincipalName), SessionId
+  | extend CountryCount = array_length(Countries)
+  | where CountryCount > 1
+  | project FirstSeen, LastSeen, UserPrincipalName, SessionId, CountryCount, Countries, IPs, Apps, SignInTypes
+entityMappings:
+  - entityType: Account
+    fieldMappings:
+      - identifier: FullName
+        columnName: UserPrincipalName
+version: 1.0.0
+kind: Scheduled

@@ -1,0 +1,12 @@
+rule: detections/azure-mass-resource-deletion.yaml
+description: Thirty storage-account deletions by one caller fire; five deletions by another don't.
+data:
+  AzureActivity:
+    - {ago: 40m, _repeat: 30, _step: 30s, OperationNameValue: MICROSOFT.STORAGE/STORAGEACCOUNTS/DELETE, ActivityStatusValue: Success, Caller: mallory@contoso.com, CallerIpAddress: 198.51.100.107, SubscriptionId: sub-1, _ResourceId: "/subscriptions/sub-1/resourceGroups/data/providers/Microsoft.Storage/storageAccounts/sa{i}"}
+    - {ago: 40m, _repeat: 5, _step: 30s, OperationNameValue: MICROSOFT.COMPUTE/DISKS/DELETE, ActivityStatusValue: Success, Caller: ops@contoso.com, CallerIpAddress: 203.0.113.107, SubscriptionId: sub-1, _ResourceId: "/subscriptions/sub-1/resourceGroups/tmp/providers/Microsoft.Compute/disks/d{i}"}
+expect:
+  rows: 1
+  include:
+    - {Caller: mallory@contoso.com}
+  exclude:
+    - {Caller: ops@contoso.com}

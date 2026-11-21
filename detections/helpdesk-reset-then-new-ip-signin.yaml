@@ -1,0 +1,61 @@
+id: 25676c66-e9e7-4a0d-b0e9-d9ae00094a13
+name: Admin reset of password or MFA followed by sign-in from a new IP
+description: |
+  Help-desk social engineering: the attacker calls IT pretending to be an employee, gets the password or MFA reset (or
+  a Temporary Access Pass issued), then signs in. This rule joins an admin-initiated password or security-info change
+  to a successful sign-in within two hours from an IP the user hasn't used in 14 days.
+  Seen in: Octo Tempest / Scattered Spider, and LAPSUS$-style intrusions.
+  Tuning: new hires and users locked out while traveling will appear; the IP and the help-desk ticket usually settle it.
+  Triage: find the ticket and call the user back on a number from HR records (not the one the caller gave). If the
+  user didn't ask for the reset, disable the account, revoke sessions and review everything it did since the reset.
+severity: High
+requiredDataConnectors:
+  - connectorId: AzureActiveDirectory
+    dataTypes:
+      - AuditLogs
+      - SigninLogs
+queryFrequency: 1h
+queryPeriod: 14d
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - InitialAccess
+  - Persistence
+relevantTechniques:
+  - T1078.004
+  - T1098.005
+  - T1656
+query: |
+  let Resets = AuditLogs
+      | where TimeGenerated > ago(3h)
+      | where OperationName in ("Reset password (by admin)", "Reset user password", "Admin registered security info",
+          "Admin deleted security info", "Admin updated security info") and Result =~ "success"
+      | extend UserPrincipalName = tolower(tostring(TargetResources[0].userPrincipalName)),
+          Admin = coalesce(tostring(InitiatedBy.user.userPrincipalName), tostring(InitiatedBy.app.displayName))
+      | summarize ResetAt = min(TimeGenerated), Changes = make_set(OperationName), Admins = make_set(Admin) by UserPrincipalName;
+  let History = SigninLogs
+      | where TimeGenerated between (ago(14d) .. ago(3h))
+      | where ResultType == "0"
+      | summarize KnownIPs = make_set(IPAddress, 500) by UserPrincipalName = tolower(UserPrincipalName);
+  SigninLogs
+  | where TimeGenerated > ago(3h)
+  | where ResultType == "0"
+  | extend UserPrincipalName = tolower(UserPrincipalName)
+  | join kind=inner Resets on UserPrincipalName
+  | where TimeGenerated between (ResetAt .. (ResetAt + 2h))
+  | join kind=leftouter History on UserPrincipalName
+  | extend KnownIPs = iff(isnull(KnownIPs), dynamic([]), KnownIPs)
+  | where not(set_has_element(KnownIPs, IPAddress))
+  | summarize FirstNewIPSignIn = min(TimeGenerated), NewIPs = make_set(IPAddress, 10), Locations = make_set(Location, 10)
+      by UserPrincipalName, ResetAt, Changes = tostring(Changes), Admin = tostring(Admins[0])
+entityMappings:
+  - entityType: Account
+    fieldMappings:
+      - identifier: FullName
+        columnName: UserPrincipalName
+  - entityType: Account
+    fieldMappings:
+      - identifier: FullName
+        columnName: Admin
+version: 1.0.0
+kind: Scheduled

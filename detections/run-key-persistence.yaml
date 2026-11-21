@@ -1,0 +1,43 @@
+id: afab4c79-b5a8-4ea1-ba8a-75bd34de38d8
+name: Run key or Winlogon value points to a script host or user-writable folder
+description: |
+  Run and RunOnce keys (and the Winlogon Shell and Userinit values) start programs at every logon. Malware writes its
+  loader path there, typically in AppData, Temp or Public, or as a PowerShell or mshta one-liner.
+  Seen in: commodity malware, infostealers and RATs (AsyncRAT, Remcos, njRAT) as well as hands-on intrusions.
+  Tuning: well-known apps that install per-user (OneDrive, Teams, Slack, Discord, Zoom) are excluded; add others you
+  allow after checking them.
+  Triage: check the file the value points to (hash, signer, prevalence), delete the value, and find what wrote it.
+severity: Medium
+requiredDataConnectors:
+  - connectorId: MicrosoftThreatProtection
+    dataTypes:
+      - DeviceRegistryEvents
+queryFrequency: 1h
+queryPeriod: 1h
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - Persistence
+relevantTechniques:
+  - T1547.001
+query: |
+  DeviceRegistryEvents
+  | where TimeGenerated > ago(1h)
+  | where ActionType == "RegistryValueSet"
+  | where RegistryKey matches regex @"(?i)\\software\\(wow6432node\\)?microsoft\\windows\\currentversion\\(run|runonce|runonceex|policies\\explorer\\run)$"
+      or (RegistryKey matches regex @"(?i)\\microsoft\\windows nt\\currentversion\\winlogon$" and RegistryValueName in~ ("Userinit", "Shell"))
+  | where RegistryValueData matches regex @"(?i)\\(appdata|temp|users\\public|programdata|perflogs)\\|powershell|pwsh|mshta|rundll32|regsvr32|wscript|cscript|cmd(\.exe)?\s+/c|https?://"
+  | where not(RegistryValueData matches regex @"(?i)\\appdata\\local\\(microsoft\\(onedrive|teams)|slack|discord|zoom)\\")
+  | project TimeGenerated, DeviceName, RegistryKey, RegistryValueName, RegistryValueData, InitiatingProcessFileName,
+      InitiatingProcessCommandLine, AccountName = InitiatingProcessAccountName
+entityMappings:
+  - entityType: Host
+    fieldMappings:
+      - identifier: HostName
+        columnName: DeviceName
+  - entityType: Account
+    fieldMappings:
+      - identifier: Name
+        columnName: AccountName
+version: 1.0.0
+kind: Scheduled

@@ -1,0 +1,46 @@
+id: 639f30ca-07b4-4f85-92fa-9ae666c79193
+name: Service principal signs in from a new country
+description: |
+  Apps and service principals usually sign in from a fixed set of places (your cloud regions, your CI runners). A
+  successful sign-in from a country the service principal hasn't used in 14 days often means its secret or certificate
+  was stolen and is being used elsewhere.
+  Seen in: Midnight Blizzard and Storm-0558 follow-on activity, and leaked client secrets in public repositories.
+  Tuning: only service principals with sign-in history are checked, so brand-new apps don't alert. Multi-region
+  workloads may need their extra countries added.
+  Triage: check which credential was used (Entra sign-in details show the key ID), rotate it, and review what the
+  service principal accessed (Graph activity logs, Azure activity).
+severity: Medium
+requiredDataConnectors:
+  - connectorId: AzureActiveDirectory
+    dataTypes:
+      - AADServicePrincipalSignInLogs
+queryFrequency: 1h
+queryPeriod: 14d
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - InitialAccess
+  - Persistence
+relevantTechniques:
+  - T1078.004
+query: |
+  let Known = AADServicePrincipalSignInLogs
+      | where TimeGenerated between (ago(14d) .. ago(1h))
+      | where ResultType == "0" and isnotempty(Location)
+      | summarize KnownCountries = make_set(Location, 100) by ServicePrincipalId;
+  AADServicePrincipalSignInLogs
+  | where TimeGenerated > ago(1h)
+  | where ResultType == "0" and isnotempty(Location)
+  | join kind=inner Known on ServicePrincipalId
+  | where not(set_has_element(KnownCountries, Location))
+  | summarize FirstSeen = min(TimeGenerated), SignIns = count(), IPs = make_set(IPAddress, 10), Resources = make_set(ResourceDisplayName, 10)
+      by ServicePrincipalName, ServicePrincipalId, AppId, Location, KnownCountries = tostring(KnownCountries)
+entityMappings:
+  - entityType: CloudApplication
+    fieldMappings:
+      - identifier: Name
+        columnName: ServicePrincipalName
+      - identifier: AppId
+        columnName: AppId
+version: 1.0.0
+kind: Scheduled

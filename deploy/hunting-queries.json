@@ -1,0 +1,414 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "workspace": {
+      "type": "string",
+      "metadata": {
+        "description": "Name of the Log Analytics workspace that has Microsoft Sentinel enabled."
+      }
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/', 'ffe36e91-aa10-4e0b-bf6d-f15f47cc90e0')]",
+      "properties": {
+        "category": "Hunting Queries",
+        "displayName": "AWS IAM user's access key used from a new IP",
+        "query": "let History = AWSCloudTrail\n    | where TimeGenerated between (ago(30d) .. ago(1d))\n    | where UserIdentityType == \"IAMUser\";\nlet KnownPairs = History | distinct UserIdentityArn, SourceIpAddress;\nlet KnownUsers = History | distinct UserIdentityArn;\nAWSCloudTrail\n| where TimeGenerated > ago(1d)\n| where UserIdentityType == \"IAMUser\" and SourceIpAddress !endswith \"amazonaws.com\"\n| join kind=leftanti KnownPairs on UserIdentityArn, SourceIpAddress\n| join kind=inner KnownUsers on UserIdentityArn\n| summarize Calls = count(), Errors = countif(isnotempty(ErrorCode)), EventNames = make_set(EventName, 20), UserAgents = make_set(UserAgent, 5),\n    FirstSeen = min(TimeGenerated) by UserIdentityArn, SourceIpAddress\n| order by Errors desc, Calls desc",
+        "version": 2,
+        "tags": [
+          {
+            "name": "description",
+            "value": "Long-lived IAM access keys leak through code repositories, CI logs and laptops. When a key that normally runs from a\nfixed set of IPs (a CI runner, an office) shows up somewhere new, it may be in someone else's hands. Only users with\nat least one prior call in 30 days are included, so new users don't flood the results.\nHow to hunt: rank by Errors (stolen keys tend to hit AccessDenied while the attacker explores) and by unusual user\nagents. Rotate any key you can't explain and move workloads to roles."
+          },
+          {
+            "name": "tactics",
+            "value": "InitialAccess,CredentialAccess"
+          },
+          {
+            "name": "techniques",
+            "value": "T1078.004,T1552.001"
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/', '66b3f43e-7e68-4b8b-a491-53ac7c0420a0')]",
+      "properties": {
+        "category": "Hunting Queries",
+        "displayName": "AWS resources created in a region the account doesn't normally use",
+        "query": "let Known = AWSCloudTrail\n    | where TimeGenerated between (ago(30d) .. ago(1d))\n    | distinct RecipientAccountId, AWSRegion;\nAWSCloudTrail\n| where TimeGenerated > ago(1d)\n| where isempty(ErrorCode) and EventName matches regex @\"^(Run|Create|Put|Start|Request|Import)\"\n| join kind=leftanti Known on RecipientAccountId, AWSRegion\n| summarize Events = count(), EventNames = make_set(EventName, 20), Principals = make_set(UserIdentityArn, 10),\n    IPs = make_set(SourceIpAddress, 10), FirstSeen = min(TimeGenerated) by RecipientAccountId, AWSRegion\n| order by Events desc",
+        "version": 2,
+        "tags": [
+          {
+            "name": "description",
+            "value": "Attackers spin up instances, functions or clusters in regions the victim never looks at (cryptomining is the common\ncase, but also staging for exfiltration). This hunt lists accounts with create, run or put calls today in a region\nthat had no activity at all in the previous 30 days.\nHow to hunt: check the principals and event names. RunInstances or RequestSpotInstances with large instance types in\nan unused region is almost always malicious. Disable unused regions with an SCP afterwards."
+          },
+          {
+            "name": "tactics",
+            "value": "Impact,DefenseEvasion"
+          },
+          {
+            "name": "techniques",
+            "value": "T1496,T1535"
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/', '6e4c3317-b9e8-4e5d-9ca2-83b52b87279f')]",
+      "properties": {
+        "category": "Hunting Queries",
+        "displayName": "Blocked by Conditional Access, then signed in elsewhere with a password only",
+        "query": "SigninLogs\n| where TimeGenerated > ago(1d)\n| extend SingleFactorSuccess = ResultType == \"0\" and AuthenticationRequirement =~ \"singleFactorAuthentication\",\n    CABlocked = ConditionalAccessStatus =~ \"failure\"\n| summarize CAFailures = countif(CABlocked), FirstBlock = minif(TimeGenerated, CABlocked), BlockedApps = make_set_if(AppDisplayName, CABlocked, 10),\n    SingleFactorSuccesses = countif(SingleFactorSuccess), LastSingleFactor = maxif(TimeGenerated, SingleFactorSuccess),\n    SingleFactorApps = make_set_if(AppDisplayName, SingleFactorSuccess, 10), IPs = make_set(IPAddress, 10)\n    by UserPrincipalName = tolower(UserPrincipalName)\n| where CAFailures > 0 and SingleFactorSuccesses > 0 and LastSingleFactor > FirstBlock\n| order by CAFailures desc",
+        "version": 2,
+        "tags": [
+          {
+            "name": "description",
+            "value": "Attackers holding a valid password often get blocked by Conditional Access on the first app they try, then probe\nother apps, clients or protocols until one isn't covered. This hunt lists users with a CA failure followed later the\nsame day by a single-factor success.\nHow to hunt: compare the blocked apps with the successful ones. A success on an app or client your policies were\nmeant to cover is a policy gap to fix; a success from the same unfamiliar IP as the block is a compromised password."
+          },
+          {
+            "name": "tactics",
+            "value": "DefenseEvasion,InitialAccess"
+          },
+          {
+            "name": "techniques",
+            "value": "T1078.004,T1556.009"
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/', 'bde80a48-4fed-4e20-9796-8655156a3d4c')]",
+      "properties": {
+        "category": "Hunting Queries",
+        "displayName": "Users clicked links in mail from a sender domain never seen before",
+        "query": "let KnownDomains = EmailEvents\n    | where TimeGenerated between (ago(30d) .. ago(1d))\n    | where EmailDirection =~ \"Inbound\"\n    | distinct SenderFromDomain;\nlet NewDomainMail = EmailEvents\n    | where TimeGenerated > ago(1d)\n    | where EmailDirection =~ \"Inbound\" and DeliveryAction =~ \"Delivered\"\n    | where SenderFromDomain !in (KnownDomains)\n    | project NetworkMessageId, RecipientEmailAddress = tolower(RecipientEmailAddress), SenderFromAddress, SenderFromDomain, Subject;\nUrlClickEvents\n| where TimeGenerated > ago(1d)\n| where ActionType =~ \"ClickAllowed\" or IsClickedThrough == true\n| extend AccountUpn = tolower(AccountUpn)\n| join kind=inner NewDomainMail on NetworkMessageId, $left.AccountUpn == $right.RecipientEmailAddress\n| summarize ClickerCount = dcount(AccountUpn), Clickers = make_set(AccountUpn, 20), Urls = make_set(Url, 10), FirstClick = min(TimeGenerated)\n    by SenderFromDomain, SenderFromAddress, Subject\n| order by ClickerCount desc",
+        "version": 2,
+        "tags": [
+          {
+            "name": "description",
+            "value": "Phishing often comes from freshly registered or lookalike domains that Defender hasn't classified yet. This hunt\nlists sender domains that first mailed the organization in the last day and whose links were clicked, ranked by how\nmany people clicked.\nHow to hunt: look for lookalikes of your own domain or of suppliers, and for domains registered in the last few\nweeks. If a domain is malicious, check the clickers' sign-ins (AiTM, MFA registration) right after the click."
+          },
+          {
+            "name": "tactics",
+            "value": "InitialAccess"
+          },
+          {
+            "name": "techniques",
+            "value": "T1566.002,T1583.001"
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/', 'a825e6de-2d5d-5cac-b011-308123ba624e')]",
+      "properties": {
+        "category": "Hunting Queries",
+        "displayName": "Dormant account signs in again",
+        "query": "let dormancy = 30d;\nlet Recent = SigninLogs\n    | where TimeGenerated > ago(1d) and ResultType == \"0\"\n    | summarize ReturnedAt = min(TimeGenerated), IPs = make_set(IPAddress, 10), Countries = make_set(Location, 10) by UserPrincipalName;\nlet Previous = SigninLogs\n    | where TimeGenerated between (ago(90d) .. ago(1d)) and ResultType == \"0\"\n    | summarize LastSeenBefore = max(TimeGenerated) by UserPrincipalName;\nRecent\n| join kind=inner Previous on UserPrincipalName\n| where ReturnedAt - LastSeenBefore > dormancy\n| extend DaysDormant = datetime_diff(\"day\", ReturnedAt, LastSeenBefore)\n| project UserPrincipalName, DaysDormant, LastSeenBefore, ReturnedAt, IPs, Countries\n| order by DaysDormant desc",
+        "version": 2,
+        "tags": [
+          {
+            "name": "description",
+            "value": "Accounts that haven't been used for a month or more are favorite targets: nobody notices when they come back to life.\nThis lists successful sign-ins in the last day by accounts whose previous successful sign-in was more than 30 days ago.\nHow to hunt: check each against HR records (leave, departures) and the account owner. Former employees and service\naccounts are the high-priority cases."
+          },
+          {
+            "name": "tactics",
+            "value": "InitialAccess,Persistence"
+          },
+          {
+            "name": "techniques",
+            "value": "T1078.004"
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/', '6daf91a1-eff2-49b4-9446-938c45fdf3f4')]",
+      "properties": {
+        "category": "Hunting Queries",
+        "displayName": "First use of Azure or Graph command-line tools by a user",
+        "query": "let AdminApps = dynamic([\"Microsoft Azure PowerShell\", \"Microsoft Azure CLI\", \"Graph Explorer\", \"Microsoft Graph Command Line Tools\",\n    \"Azure Active Directory PowerShell\", \"Microsoft Exchange REST API Based Powershell\", \"Microsoft Intune PowerShell\"]);\nlet Known = SigninLogs\n    | where TimeGenerated between (ago(30d) .. ago(1d))\n    | where AppDisplayName in (AdminApps)\n    | distinct UserPrincipalName = tolower(UserPrincipalName), AppDisplayName;\nSigninLogs\n| where TimeGenerated > ago(1d)\n| where ResultType == \"0\" and AppDisplayName in (AdminApps)\n| extend UserPrincipalName = tolower(UserPrincipalName)\n| join kind=leftanti Known on UserPrincipalName, AppDisplayName\n| summarize FirstSeen = min(TimeGenerated), SignIns = count(), IPs = make_set(IPAddress, 10), Locations = make_set(Location, 5)\n    by UserPrincipalName, AppDisplayName\n| order by FirstSeen desc",
+        "version": 2,
+        "tags": [
+          {
+            "name": "description",
+            "value": "Azure PowerShell, Azure CLI, Graph Explorer and the Microsoft Graph PowerShell SDK are how attackers (and tools like\nGraphRunner and ROADtools that impersonate them) query and change a tenant after taking over an account. This hunt\nlists users who signed in to one of these apps today and hadn't in the previous 30 days.\nHow to hunt: expect admins and developers; focus on users outside IT, sign-ins from unfamiliar IPs, and users who\nalso show up in the Graph enumeration rule or the device code rule."
+          },
+          {
+            "name": "tactics",
+            "value": "Execution,Discovery"
+          },
+          {
+            "name": "techniques",
+            "value": "T1059.009,T1087.004"
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/', 'e0f8c796-1a95-4024-b0d8-0c9e0db2ded0')]",
+      "properties": {
+        "category": "Hunting Queries",
+        "displayName": "One account logging on to many devices over the network",
+        "query": "DeviceLogonEvents\n| where TimeGenerated > ago(1d)\n| where ActionType == \"LogonSuccess\" and LogonType in (\"Network\", \"RemoteInteractive\")\n| where AccountName !endswith \"$\"\n| summarize DeviceCount = dcount(DeviceName), Devices = make_set(DeviceName, 50), SourceIPs = make_set(RemoteIP, 10),\n    FirstSeen = min(TimeGenerated), LastSeen = max(TimeGenerated) by AccountDomain, AccountName\n| where DeviceCount >= 10\n| order by DeviceCount desc",
+        "version": 2,
+        "tags": [
+          {
+            "name": "description",
+            "value": "Lateral movement looks like one account (often a stolen admin or service account) making network or RDP logons to\nmany machines in a short time. This hunt lists user accounts with successful network or remote-interactive logons to\nten or more devices in the last day.\nHow to hunt: management servers, vulnerability scanners and backup accounts will top the list; note them once. Focus\non regular user accounts, accounts that don't normally do this, and source IPs that are workstations."
+          },
+          {
+            "name": "tactics",
+            "value": "LateralMovement"
+          },
+          {
+            "name": "techniques",
+            "value": "T1021.001,T1021.002,T1078.002"
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/', 'c8b393e9-e91e-4dae-a7fb-9984fc7cd9fa')]",
+      "properties": {
+        "category": "Hunting Queries",
+        "displayName": "Large numbers of mail items deleted from a mailbox",
+        "query": "OfficeActivity\n| where TimeGenerated > ago(1d)\n| where OfficeWorkload == \"Exchange\" and Operation in (\"HardDelete\", \"SoftDelete\", \"MoveToDeletedItems\")\n| summarize HardDeletes = countif(Operation == \"HardDelete\"), SoftDeletes = countif(Operation == \"SoftDelete\"),\n    MovedToDeleted = countif(Operation == \"MoveToDeletedItems\"), ClientIPs = make_set(ClientIP, 10),\n    FirstSeen = min(TimeGenerated), LastSeen = max(TimeGenerated) by Actor = UserId, MailboxOwnerUPN\n| where HardDeletes >= 50 or (HardDeletes + SoftDeletes + MovedToDeleted) >= 500\n| extend ActorIsOwner = tolower(Actor) == tolower(MailboxOwnerUPN)\n| order by HardDeletes desc",
+        "version": 2,
+        "tags": [
+          {
+            "name": "description",
+            "value": "Bulk deletion of mail can be an attacker covering tracks (deleting sent phishing, security notifications or replies\nfrom a fraud victim), an insider destroying records, or someone tidying their inbox. Hard deletes (bypassing Deleted\nItems) are the more interesting signal.\nHow to hunt: look at rows where the actor isn't the mailbox owner, or where the client IP is unfamiliar. Pair with\nthe inbox-rule rules and with sign-ins for the same user around the same time."
+          },
+          {
+            "name": "tactics",
+            "value": "DefenseEvasion,Impact"
+          },
+          {
+            "name": "techniques",
+            "value": "T1070.008,T1485"
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/', '221a714b-277a-5668-a865-31de9316d7c2')]",
+      "properties": {
+        "category": "Hunting Queries",
+        "displayName": "MFA fatigue (repeated push denials)",
+        "query": "let minDenials = 5;\nlet Window = SigninLogs | where TimeGenerated > ago(1d);\nWindow\n| where ResultType == \"500121\"\n| summarize Denials = count(), IPs = make_set(IPAddress, 10), FirstDenial = min(TimeGenerated), LastDenial = max(TimeGenerated)\n    by UserPrincipalName, Hour = bin(TimeGenerated, 1h)\n| where Denials >= minDenials\n| join kind=leftouter (\n    Window | where ResultType == \"0\" | summarize LastSuccess = max(TimeGenerated) by UserPrincipalName\n  ) on UserPrincipalName\n| extend SuccessAfterDenials = isnotnull(LastSuccess) and LastSuccess > FirstDenial\n| project UserPrincipalName, Hour, Denials, FirstDenial, LastDenial, SuccessAfterDenials, LastSuccess, IPs\n| order by SuccessAfterDenials desc, Denials desc",
+        "version": 2,
+        "tags": [
+          {
+            "name": "description",
+            "value": "MFA fatigue attacks bombard a user with push prompts until they approve one. Look for users with a burst of denied or\nfailed MFA prompts in an hour, then check whether a successful sign-in followed.\nHow to hunt: start with rows where SuccessAfterDenials is true. Call the user (not by email) and ask whether they\napproved a prompt they didn't start. If so, revoke sessions and reset credentials."
+          },
+          {
+            "name": "tactics",
+            "value": "CredentialAccess"
+          },
+          {
+            "name": "techniques",
+            "value": "T1621"
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/', '1937b47a-8a71-40b3-81d8-2cf4b8c54f0e')]",
+      "properties": {
+        "category": "Hunting Queries",
+        "displayName": "Regular-interval connections to a public IP (C2 beaconing)",
+        "query": "DeviceNetworkEvents\n| where TimeGenerated > ago(1d)\n| where ActionType == \"ConnectionSuccess\" and isnotempty(RemoteIP) and not(ipv4_is_private(RemoteIP))\n| project TimeGenerated, DeviceName, InitiatingProcessFileName, RemoteIP, RemoteUrl, RemotePort\n| sort by DeviceName asc, InitiatingProcessFileName asc, RemoteIP asc, RemotePort asc, TimeGenerated asc\n| extend SameFlow = DeviceName == prev(DeviceName) and InitiatingProcessFileName == prev(InitiatingProcessFileName)\n    and RemoteIP == prev(RemoteIP) and RemotePort == prev(RemotePort)\n| extend Gap = iff(SameFlow, datetime_diff(\"second\", TimeGenerated, prev(TimeGenerated)), long(null))\n| where isnotnull(Gap)\n| summarize Connections = count() + 1, AvgGapSeconds = avg(Gap), StdevGap = stdev(Gap), FirstSeen = min(TimeGenerated),\n    LastSeen = max(TimeGenerated), RemoteUrl = take_any(RemoteUrl)\n    by DeviceName, InitiatingProcessFileName, RemoteIP, RemotePort\n| where Connections >= 50 and AvgGapSeconds >= 10\n| extend Jitter = round(StdevGap / AvgGapSeconds, 3)\n| where Jitter < 0.2\n| order by Jitter asc, Connections desc",
+        "version": 2,
+        "tags": [
+          {
+            "name": "description",
+            "value": "Command-and-control implants check in on a timer (every 60 seconds plus a little jitter, for example). This hunt\nfinds process-to-destination pairs with 50+ connections in a day whose gaps between connections barely vary\n(Jitter = standard deviation / mean of the interval, below 0.2).\nHow to hunt: start with the lowest Jitter and the least-known processes. Update agents, telemetry and NTP will show\nup with near-zero jitter too; check the destination (RemoteUrl, WHOIS, threat intel) and the process path before\ndigging into the device."
+          },
+          {
+            "name": "tactics",
+            "value": "CommandAndControl"
+          },
+          {
+            "name": "techniques",
+            "value": "T1071.001,T1573"
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/', '7a1c52fe-5371-5f5f-8e69-a58aa40381ee')]",
+      "properties": {
+        "category": "Hunting Queries",
+        "displayName": "Apps granted access to mailboxes",
+        "query": "AuditLogs\n| where TimeGenerated > ago(30d)\n| where OperationName == \"Consent to application\" and Result =~ \"success\"\n| mv-apply Prop = TargetResources[0].modifiedProperties on (\n    where tostring(Prop.displayName) == \"ConsentAction.Permissions\"\n    | extend Permissions = tostring(Prop.newValue)\n  )\n| extend MailScopes = extract_all(@\"((?:Mail|MailboxSettings|EWS)\\.[\\w\\.]+|full_access_as_app)\", Permissions)\n| where array_length(MailScopes) > 0\n| summarize Consents = count(), ConsentedBy = make_set(tostring(InitiatedBy.user.userPrincipalName), 25),\n    Scopes = make_set(MailScopes), LastConsent = max(TimeGenerated)\n    by AppName = tostring(TargetResources[0].displayName), AppId = tostring(TargetResources[0].id)\n| order by LastConsent desc",
+        "version": 2,
+        "tags": [
+          {
+            "name": "description",
+            "value": "Lists every app that received mail permissions through consent in the last 30 days, with who consented. Mail access is\nwhat business email compromise needs, and apps keep that access after a password reset.\nHow to hunt: review each app's publisher and purpose; revoke anything unknown in Entra ID (Enterprise applications),\nand check the consenting users' recent sign-ins."
+          },
+          {
+            "name": "tactics",
+            "value": "Collection,CredentialAccess"
+          },
+          {
+            "name": "techniques",
+            "value": "T1528,T1114.002"
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/', '325a677b-72ef-4d12-8739-d24176a51e16')]",
+      "properties": {
+        "category": "Hunting Queries",
+        "displayName": "Rare executables run from user-writable folders",
+        "query": "let Prevalence = DeviceProcessEvents\n    | where TimeGenerated > ago(7d)\n    | where isnotempty(SHA256)\n    | summarize DeviceCount = dcount(DeviceName) by SHA256;\nDeviceProcessEvents\n| where TimeGenerated > ago(1d)\n| where isnotempty(SHA256)\n| where FolderPath matches regex @\"(?i)\\\\(appdata|temp|downloads|users\\\\public|programdata|perflogs)\\\\\"\n| summarize FirstSeen = min(TimeGenerated), Executions = count(), Devices = make_set(DeviceName, 5), Paths = make_set(FolderPath, 5),\n    Parents = make_set(InitiatingProcessFileName, 5) by SHA256, FileName\n| join kind=inner Prevalence on SHA256\n| where DeviceCount <= 2\n| project FirstSeen, FileName, SHA256, DeviceCount, Executions, Devices, Paths, Parents\n| order by DeviceCount asc, FirstSeen desc",
+        "version": 2,
+        "tags": [
+          {
+            "name": "description",
+            "value": "Malware usually runs from Downloads, AppData, Temp, Public or ProgramData, and a new payload's hash is seen on only one\nor two devices. This hunt lists binaries run from those folders in the last day whose SHA256 appears on two or fewer\ndevices across the whole estate in the last week.\nHow to hunt: look the hashes up (Defender file page, VirusTotal), check the signer and the parent process. Anything\nunsigned launched by an Office app, a browser or a script host comes first."
+          },
+          {
+            "name": "tactics",
+            "value": "Execution"
+          },
+          {
+            "name": "techniques",
+            "value": "T1204.002"
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/', 'de4de3e0-7860-5000-b4e6-3ee5454c79d9')]",
+      "properties": {
+        "category": "Hunting Queries",
+        "displayName": "Successful sign-ins with rarely seen user agents",
+        "query": "let maxSeen = 3;\nlet AgentCounts = SigninLogs\n    | where TimeGenerated > ago(30d) and ResultType == \"0\"\n    | summarize TimesSeen = count(), UsersWithAgent = dcount(UserPrincipalName) by UserAgent;\nSigninLogs\n| where TimeGenerated > ago(1d) and ResultType == \"0\"\n| join kind=inner (AgentCounts | where TimesSeen <= maxSeen) on UserAgent\n| project TimeGenerated, UserPrincipalName, UserAgent, TimesSeen, UsersWithAgent, IPAddress, Location, AppDisplayName\n| order by TimesSeen asc, TimeGenerated desc",
+        "version": 2,
+        "tags": [
+          {
+            "name": "description",
+            "value": "Attack tools and scripts (python-requests, curl, unusual browsers) often show up as user agents almost never seen in\nyour tenant. Lists successful sign-ins in the last day whose user agent appeared three or fewer times in 30 days.\nHow to hunt: script-like agents on interactive user accounts are the top priority; then agents tied to a single user\nfrom a new IP."
+          },
+          {
+            "name": "tactics",
+            "value": "InitialAccess,DefenseEvasion"
+          },
+          {
+            "name": "techniques",
+            "value": "T1078.004"
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/', '040ecf47-4ab8-55c6-a15d-5feb1e6102d5')]",
+      "properties": {
+        "category": "Hunting Queries",
+        "displayName": "New credentials added to an app or service principal",
+        "query": "AuditLogs\n| where TimeGenerated > ago(7d)\n| where OperationName == \"Add service principal credentials\" or OperationName has \"Certificates and secrets management\"\n| where Result =~ \"success\"\n| extend AppName = tostring(TargetResources[0].displayName), AppId = tostring(TargetResources[0].id),\n    Actor = coalesce(tostring(InitiatedBy.user.userPrincipalName), tostring(InitiatedBy.app.displayName)),\n    ActorIP = tostring(InitiatedBy.user.ipAddress)\n| project TimeGenerated, OperationName, AppName, AppId, Actor, ActorIP\n| order by TimeGenerated desc",
+        "version": 2,
+        "tags": [
+          {
+            "name": "description",
+            "value": "Adding a secret or certificate to an existing app lets an attacker authenticate as that app, often with broad API\npermissions and no MFA. Legitimate rotations happen, so this is a hunt, not an alert.\nHow to hunt: focus on apps with high-privilege permissions, credentials added by people who don't own the app, and\nchanges outside your normal rotation schedule."
+          },
+          {
+            "name": "tactics",
+            "value": "Persistence,PrivilegeEscalation"
+          },
+          {
+            "name": "techniques",
+            "value": "T1098.001"
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/', '7ea74376-f66b-4888-ac8b-d8fcf0db4fa2')]",
+      "properties": {
+        "category": "Hunting Queries",
+        "displayName": "Bulk download from a SharePoint site the user hasn't used before",
+        "query": "let Known = OfficeActivity\n    | where TimeGenerated between (ago(30d) .. ago(1d))\n    | where OfficeWorkload in (\"SharePoint\", \"OneDrive\")\n    | distinct UserId, Site_Url;\nOfficeActivity\n| where TimeGenerated > ago(1d)\n| where OfficeWorkload in (\"SharePoint\", \"OneDrive\") and Operation in (\"FileDownloaded\", \"FileSyncDownloadedFull\")\n| join kind=leftanti Known on UserId, Site_Url\n| summarize Files = dcount(SourceFileName), SampleFiles = make_set(SourceFileName, 10), ClientIPs = make_set(ClientIP, 5),\n    FirstSeen = min(TimeGenerated) by UserId, Site_Url\n| where Files >= 25\n| order by Files desc",
+        "version": 2,
+        "tags": [
+          {
+            "name": "description",
+            "value": "People mostly work in the same handful of sites. Downloading 25+ files from a site the user hasn't touched in 30 days\nis how both departing employees and attackers with a stolen session collect data, and it stays under the tenant-wide\nmass-download threshold.\nHow to hunt: check whether the site matches the user's job (HR files pulled by an engineer is the classic case), and\nwhether the downloads came from a managed device or an unfamiliar IP."
+          },
+          {
+            "name": "tactics",
+            "value": "Collection,Exfiltration"
+          },
+          {
+            "name": "techniques",
+            "value": "T1213.002,T1530"
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.OperationalInsights/workspaces/savedSearches",
+      "apiVersion": "2020-08-01",
+      "name": "[concat(parameters('workspace'), '/', '5ddaf768-e0c3-4f02-8980-570fa916a977')]",
+      "properties": {
+        "category": "Hunting Queries",
+        "displayName": "Storage account keys listed by a new caller",
+        "query": "let Known = AzureActivity\n    | where TimeGenerated between (ago(14d) .. ago(1d))\n    | where OperationNameValue =~ \"MICROSOFT.STORAGE/STORAGEACCOUNTS/LISTKEYS/ACTION\"\n    | distinct Caller;\nAzureActivity\n| where TimeGenerated > ago(1d)\n| where OperationNameValue =~ \"MICROSOFT.STORAGE/STORAGEACCOUNTS/LISTKEYS/ACTION\" and ActivityStatusValue in~ (\"Success\", \"Succeeded\")\n| where Caller !in (Known)\n| summarize StorageAccountCount = dcount(_ResourceId), StorageAccounts = make_set(_ResourceId, 20), IPs = make_set(CallerIpAddress, 10),\n    FirstSeen = min(TimeGenerated) by Caller\n| order by StorageAccountCount desc",
+        "version": 2,
+        "tags": [
+          {
+            "name": "description",
+            "value": "A storage account key gives full access to every blob, file share, queue and table in the account, and it isn't tied\nto the caller's identity, so later data access doesn't show who did it. Listing keys is noisy (the portal does it),\nso this is a hunt: callers who listed keys today and hadn't in the previous 14 days.\nHow to hunt: callers listing keys on many accounts at once rank first. Check whether the account then showed reads\nfrom unfamiliar IPs (StorageBlobLogs, if collected), and consider disabling shared key access entirely."
+          },
+          {
+            "name": "tactics",
+            "value": "CredentialAccess"
+          },
+          {
+            "name": "techniques",
+            "value": "T1552.001,T1098.001"
+          }
+        ]
+      }
+    }
+  ]
+}

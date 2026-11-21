@@ -1,0 +1,52 @@
+id: 68e6eca1-be4c-403c-811f-4cfc9bf8fdb5
+name: S3 bucket made public or its public access block removed
+description: |
+  A bucket policy with Principal "*", a public ACL, or removing Block Public Access exposes the bucket's contents to
+  the internet. Attackers do this to pull data out without their own credentials showing up in data-access logs;
+  more often it's a mistake that leads to a breach.
+  Tuning: buckets that host public websites or downloads are expected; list them in PublicBuckets.
+  Triage: re-enable Block Public Access, check S3 server access logs or CloudTrail data events for anonymous GETs while
+  the bucket was open, and review who made the change.
+severity: High
+requiredDataConnectors:
+  - connectorId: AWS
+    dataTypes:
+      - AWSCloudTrail
+queryFrequency: 1h
+queryPeriod: 1h
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - Exfiltration
+  - Collection
+relevantTechniques:
+  - T1530
+  - T1537
+query: |
+  let PublicBuckets = dynamic(["www.contoso.example"]);
+  AWSCloudTrail
+  | where TimeGenerated > ago(1h)
+  | where EventSource == "s3.amazonaws.com" and isempty(ErrorCode)
+  | extend Bucket = tostring(parse_json(RequestParameters).bucketName)
+  | where Bucket !in (PublicBuckets)
+  | extend Change = case(
+      EventName == "PutBucketAcl" and RequestParameters matches regex @"(?i)AllUsers|AuthenticatedUsers|public-read", "Public ACL",
+      EventName == "PutBucketPolicy" and RequestParameters matches regex @"""Principal""\s*:\s*(""\*""|\{\s*""AWS""\s*:\s*""\*""\s*\})"
+          and RequestParameters contains '"Allow"', "Public bucket policy",
+      EventName in ("DeleteBucketPublicAccessBlock", "DeleteAccountPublicAccessBlock"), "Public access block deleted",
+      EventName in ("PutBucketPublicAccessBlock", "PutAccountPublicAccessBlock")
+          and RequestParameters matches regex @"""(BlockPublicAcls|IgnorePublicAcls|BlockPublicPolicy|RestrictPublicBuckets)""\s*:\s*false", "Public access block weakened",
+      "")
+  | where isnotempty(Change)
+  | project TimeGenerated, Bucket, Change, EventName, UserIdentityArn, SourceIpAddress, RecipientAccountId, RequestParameters
+entityMappings:
+  - entityType: Account
+    fieldMappings:
+      - identifier: Name
+        columnName: UserIdentityArn
+  - entityType: IP
+    fieldMappings:
+      - identifier: Address
+        columnName: SourceIpAddress
+version: 1.0.0
+kind: Scheduled

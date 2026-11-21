@@ -1,0 +1,14 @@
+rule: detections/mailbox-permission-granted.yaml
+description: FullAccess and SendAs grants by an admin fire; a system-initiated grant doesn't.
+data:
+  OfficeActivity:
+    - {ago: 10m, Operation: Add-MailboxPermission, OfficeWorkload: Exchange, UserId: admin1@contoso.com, ClientIP: 198.51.100.27, Parameters: '[{"Name":"Identity","Value":"cfo@contoso.com"},{"Name":"User","Value":"mallory@contoso.com"},{"Name":"AccessRights","Value":"FullAccess"},{"Name":"InheritanceType","Value":"All"}]'}
+    - {ago: 10m, Operation: Add-RecipientPermission, OfficeWorkload: Exchange, UserId: admin1@contoso.com, ClientIP: 198.51.100.27, Parameters: '[{"Name":"Identity","Value":"cfo@contoso.com"},{"Name":"Trustee","Value":"mallory@contoso.com"},{"Name":"AccessRights","Value":"SendAs"}]'}
+    - {ago: 10m, Operation: Add-MailboxPermission, OfficeWorkload: Exchange, UserId: NT AUTHORITY\SYSTEM (Microsoft.Exchange.ServiceHost), ClientIP: "", Parameters: '[{"Name":"Identity","Value":"shared-hr@contoso.com"},{"Name":"User","Value":"hr-team@contoso.com"},{"Name":"AccessRights","Value":"FullAccess"}]'}
+expect:
+  rows: 2
+  include:
+    - {Grantee: mallory@contoso.com, AccessRights: FullAccess}
+    - {Grantee: mallory@contoso.com, AccessRights: SendAs}
+  exclude:
+    - {Mailbox: shared-hr@contoso.com}

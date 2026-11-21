@@ -1,0 +1,14 @@
+rule: detections/impacket-remote-execution.yaml
+description: wmiexec and smbexec command lines fire with the right method; a normal cmd /c dir doesn't.
+data:
+  DeviceProcessEvents:
+    - {ago: 10m, DeviceName: fs01, AccountName: svc-backup, FileName: cmd.exe, ProcessCommandLine: 'cmd.exe /Q /c whoami 1> \\127.0.0.1\ADMIN$\__1732190000.4417 2>&1', InitiatingProcessFileName: WmiPrvSE.exe}
+    - {ago: 10m, DeviceName: fs02, AccountName: system, FileName: cmd.exe, ProcessCommandLine: 'cmd.exe /Q /c echo ipconfig ^> \\127.0.0.1\C$\__output 2^>^&1 > %TEMP%\execute.bat', InitiatingProcessFileName: services.exe}
+    - {ago: 10m, DeviceName: it-ws-01, AccountName: alice, FileName: cmd.exe, ProcessCommandLine: 'cmd.exe /c dir C:\temp', InitiatingProcessFileName: explorer.exe}
+expect:
+  rows: 2
+  include:
+    - {DeviceName: fs01, Method: wmiexec}
+    - {DeviceName: fs02, Method: smbexec}
+  exclude:
+    - {DeviceName: it-ws-01}

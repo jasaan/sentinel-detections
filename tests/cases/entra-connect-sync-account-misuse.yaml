@@ -1,0 +1,15 @@
+rule: detections/entra-connect-sync-account-misuse.yaml
+description: The sync account signing in to the Azure portal fires; its normal sync sign-in and a regular user don't.
+data:
+  SigninLogs:
+    - {ago: 15m, UserPrincipalName: Sync_ADC01_1a2b3c@contoso.onmicrosoft.com, ResultType: "0", AppDisplayName: Azure Portal, IPAddress: 198.51.100.55}
+    - {ago: 15m, UserPrincipalName: alice@contoso.com, ResultType: "0", AppDisplayName: Azure Portal, IPAddress: 203.0.113.55}
+  AADNonInteractiveUserSignInLogs:
+    - {ago: 10m, UserPrincipalName: Sync_ADC02_9z8y7x@contoso.onmicrosoft.com, ResultType: "0", AppDisplayName: Microsoft Azure Active Directory Connect, IPAddress: 203.0.113.56}
+expect:
+  rows: 1
+  include:
+    - {UserPrincipalName: Sync_ADC01_1a2b3c@contoso.onmicrosoft.com}
+  exclude:
+    - {UserPrincipalName: alice@contoso.com}
+    - {UserPrincipalName: Sync_ADC02_9z8y7x@contoso.onmicrosoft.com}

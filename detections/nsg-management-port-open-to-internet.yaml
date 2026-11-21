@@ -1,0 +1,49 @@
+id: 24c7adf0-bd1a-4aeb-bd44-dfc584683532
+name: Network security group rule opens RDP, SSH or WinRM to the internet
+description: |
+  An inbound allow rule from any source to 3389, 22, 5985 or 5986 exposes the VM to constant brute forcing within
+  minutes. Attackers open these ports for direct access; admins open them "temporarily" and forget.
+  Tuning: if you use Azure Bastion or just-in-time VM access, legitimate rules shouldn't use * or Internet as the
+  source. Port ranges (for example 3380-3390) aren't parsed; the explicit ports and * are.
+  Triage: remove or narrow the rule, then check DeviceLogonEvents or SecurityEvent on the VM for logons from public IPs
+  while it was open.
+severity: Medium
+requiredDataConnectors:
+  - connectorId: AzureActivity
+    dataTypes:
+      - AzureActivity
+queryFrequency: 1h
+queryPeriod: 1h
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - DefenseEvasion
+  - InitialAccess
+relevantTechniques:
+  - T1562.007
+  - T1133
+query: |
+  AzureActivity
+  | where TimeGenerated > ago(1h)
+  | where OperationNameValue in~ ("MICROSOFT.NETWORK/NETWORKSECURITYGROUPS/SECURITYRULES/WRITE", "MICROSOFT.NETWORK/NETWORKSECURITYGROUPS/WRITE")
+  | where ActivityStatusValue !in~ ("Failure", "Failed")
+  | extend Body = parse_json(tostring(Properties_d.requestbody))
+  | mv-expand Rule = iff(isnotnull(Body.properties.securityRules), Body.properties.securityRules, pack_array(Body))
+  | extend R = Rule.properties
+  | extend Source = strcat(tostring(R.sourceAddressPrefix), ",", strcat_array(R.sourceAddressPrefixes, ",")),
+      Ports = strcat(tostring(R.destinationPortRange), ",", strcat_array(R.destinationPortRanges, ","))
+  | where tostring(R.access) =~ "Allow" and tostring(R.direction) =~ "Inbound"
+  | where Source matches regex @"(?i)(^|,)\s*(\*|0\.0\.0\.0/0|internet|any)\s*(,|$)"
+  | where Ports matches regex @"(^|,)\s*(\*|22|3389|5985|5986)\s*(,|$)"
+  | summarize FirstSeen = min(TimeGenerated) by Caller, CallerIpAddress, RuleId = _ResourceId, RuleName = tostring(Rule.name), Source, Ports
+entityMappings:
+  - entityType: Account
+    fieldMappings:
+      - identifier: FullName
+        columnName: Caller
+  - entityType: AzureResource
+    fieldMappings:
+      - identifier: ResourceId
+        columnName: RuleId
+version: 1.0.0
+kind: Scheduled

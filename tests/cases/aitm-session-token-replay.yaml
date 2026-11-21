@@ -1,0 +1,18 @@
+rule: detections/aitm-session-token-replay.yaml
+description: One session used from the US and the Netherlands fires; a session from two US IPs and a failed foreign attempt don't.
+data:
+  SigninLogs:
+    - {ago: 90m, UserPrincipalName: alice@contoso.com, ResultType: "0", SessionId: s-alice-1, Location: NL, IPAddress: 198.51.100.66, AppDisplayName: OfficeHome}
+    - {ago: 60m, UserPrincipalName: bob@contoso.com, ResultType: "0", SessionId: s-bob-1, Location: US, IPAddress: 203.0.113.40, AppDisplayName: OfficeHome}
+    - {ago: 60m, UserPrincipalName: carol@contoso.com, ResultType: "0", SessionId: s-carol-1, Location: US, IPAddress: 203.0.113.41, AppDisplayName: OfficeHome}
+    - {ago: 50m, UserPrincipalName: carol@contoso.com, ResultType: "50126", SessionId: s-carol-1, Location: RU, IPAddress: 198.51.100.67, AppDisplayName: OfficeHome}
+  AADNonInteractiveUserSignInLogs:
+    - {ago: 80m, UserPrincipalName: Alice@contoso.com, ResultType: "0", SessionId: s-alice-1, Location: US, IPAddress: 203.0.113.42, AppDisplayName: Microsoft Teams}
+    - {ago: 30m, UserPrincipalName: bob@contoso.com, ResultType: "0", SessionId: s-bob-1, Location: US, IPAddress: 203.0.113.43, AppDisplayName: Microsoft Teams}
+expect:
+  rows: 1
+  include:
+    - {UserPrincipalName: alice@contoso.com, CountryCount: 2}
+  exclude:
+    - {UserPrincipalName: bob@contoso.com}
+    - {UserPrincipalName: carol@contoso.com}

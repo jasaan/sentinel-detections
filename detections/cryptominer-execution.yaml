@@ -1,0 +1,39 @@
+id: 9ed9afd8-e700-4c0c-8497-4ff69f350cf0
+name: Cryptocurrency miner started
+description: |
+  Attackers who get into cloud VMs, containers or exposed servers often just mine cryptocurrency. Miners are easy to
+  spot by name (XMRig and friends) or by their pool arguments (stratum+tcp://, --donate-level, RandomX algorithms).
+  Seen in: TeamTNT, Kinsing, 8220 Gang and opportunistic exploitation of exposed Docker, Redis and Kubernetes.
+  Tuning: none expected on business systems.
+  Triage: kill the process, find how it got there (cron, systemd unit, container image, exploited service), and treat
+  the host as compromised: miners are often a sign of wider access.
+severity: Medium
+requiredDataConnectors:
+  - connectorId: MicrosoftThreatProtection
+    dataTypes:
+      - DeviceProcessEvents
+queryFrequency: 1h
+queryPeriod: 1h
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - Impact
+relevantTechniques:
+  - T1496
+query: |
+  DeviceProcessEvents
+  | where TimeGenerated > ago(1h)
+  | where FileName matches regex @"(?i)^(xmrig|xmr-stak|minerd|cpuminer|nbminer|t-rex|lolminer|phoenixminer|kdevtmpfsi|kinsing)(\.exe)?$"
+      or ProcessCommandLine matches regex @"(?i)stratum\+(tcp|ssl|tls)://|--donate-level|--coin[= ]+(monero|xmr)\b|--algo[= ]+(rx/0|randomx|cryptonight)"
+  | project TimeGenerated, DeviceName, AccountName, FileName, FolderPath, ProcessCommandLine, InitiatingProcessFileName
+entityMappings:
+  - entityType: Host
+    fieldMappings:
+      - identifier: HostName
+        columnName: DeviceName
+  - entityType: Account
+    fieldMappings:
+      - identifier: Name
+        columnName: AccountName
+version: 1.0.0
+kind: Scheduled

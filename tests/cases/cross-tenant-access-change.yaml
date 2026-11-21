@@ -1,0 +1,14 @@
+rule: detections/cross-tenant-access-change.yaml
+description: Adding a partner and changing the default cross-tenant setting fire; an unrelated policy update doesn't.
+data:
+  AuditLogs:
+    - {ago: 20m, OperationName: Add a partner to cross-tenant access setting, Result: success, Category: CrossTenantAccessSettings, InitiatedBy: {user: {userPrincipalName: admin1@contoso.com}}, TargetResources: [{displayName: 00000000-1111-2222-3333-444444444444, id: 00000000-1111-2222-3333-444444444444}]}
+    - {ago: 15m, OperationName: Update the company default cross-tenant access setting, Result: success, Category: CrossTenantAccessSettings, InitiatedBy: {user: {userPrincipalName: admin1@contoso.com}}, TargetResources: [{displayName: default}]}
+    - {ago: 15m, OperationName: Update policy, Result: success, Category: Policy, InitiatedBy: {user: {userPrincipalName: admin2@contoso.com}}, TargetResources: [{displayName: Token lifetime}]}
+expect:
+  rows: 2
+  include:
+    - {OperationName: Add a partner to cross-tenant access setting}
+    - {OperationName: Update the company default cross-tenant access setting}
+  exclude:
+    - {Actor: admin2@contoso.com}

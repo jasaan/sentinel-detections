@@ -1,0 +1,42 @@
+id: b8b34d91-a5b1-48c8-90c4-ee60be85b2fe
+name: Successful sign-in over legacy authentication
+description: |
+  Legacy protocols (IMAP, POP, SMTP AUTH, older Exchange protocols) can't do MFA, so password spraying and stolen
+  passwords work against them even when MFA is enforced elsewhere. A successful legacy sign-in means a password alone
+  got someone into the account.
+  Seen in: password spray campaigns that target IMAP and SMTP AUTH to get around MFA.
+  Tuning: scanners, printers and line-of-business apps that send mail over SMTP AUTH are the usual noise; move them to
+  OAuth or a connector and allow-list the accounts that remain. Blocking legacy auth with Conditional Access is the fix.
+  Triage: if the account isn't a known device or service account, treat it as compromised: reset the password, revoke
+  sessions and check the mailbox for rules and sent items.
+severity: Medium
+requiredDataConnectors:
+  - connectorId: AzureActiveDirectory
+    dataTypes:
+      - SigninLogs
+queryFrequency: 1h
+queryPeriod: 1h
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - InitialAccess
+  - DefenseEvasion
+relevantTechniques:
+  - T1078.004
+  - T1110.003
+query: |
+  let LegacyClients = dynamic(["IMAP4", "POP3", "Authenticated SMTP", "Exchange ActiveSync", "Exchange Web Services",
+      "AutoDiscover", "MAPI Over HTTP", "Offline Address Book", "Outlook Anywhere (RPC over HTTP)",
+      "Exchange Online PowerShell", "Other clients"]);
+  SigninLogs
+  | where TimeGenerated > ago(1h)
+  | where ResultType == "0" and ClientAppUsed in~ (LegacyClients)
+  | summarize FirstSeen = min(TimeGenerated), SignIns = count(), IPs = make_set(IPAddress, 10), Locations = make_set(Location, 10)
+      by UserPrincipalName = tolower(UserPrincipalName), ClientAppUsed
+entityMappings:
+  - entityType: Account
+    fieldMappings:
+      - identifier: FullName
+        columnName: UserPrincipalName
+version: 1.0.0
+kind: Scheduled

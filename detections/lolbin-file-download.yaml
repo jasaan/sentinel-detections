@@ -1,0 +1,47 @@
+id: 1422a23f-9a2e-4bf4-b6e0-7ffb39aa6b46
+name: File downloaded with a built-in Windows tool
+description: |
+  certutil, bitsadmin, mshta, regsvr32 and PowerShell's web cmdlets are signed Windows binaries that can fetch and run
+  remote payloads, so attackers use them instead of bringing their own downloader ("living off the land").
+  Seen in: initial-stage loaders and hands-on intrusions across the LOLBAS catalog.
+  Tuning: some software deployment scripts use bitsadmin or Invoke-WebRequest with -OutFile; allow-list them by parent
+  process or script path. PowerShell is only flagged when the download is executed (IEX) or saved as code.
+  Triage: get the URL, check what was downloaded and whether it ran (child processes, DeviceFileEvents), and block the
+  domain or IP.
+severity: Medium
+requiredDataConnectors:
+  - connectorId: MicrosoftThreatProtection
+    dataTypes:
+      - DeviceProcessEvents
+queryFrequency: 1h
+queryPeriod: 1h
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - CommandAndControl
+  - DefenseEvasion
+relevantTechniques:
+  - T1105
+  - T1218
+query: |
+  DeviceProcessEvents
+  | where TimeGenerated > ago(1h)
+  | where (FileName =~ "certutil.exe" and ProcessCommandLine matches regex @"(?i)[-/](urlcache|verifyctl)\b" and ProcessCommandLine contains "http")
+      or (FileName =~ "bitsadmin.exe" and ProcessCommandLine matches regex @"(?i)/(transfer|addfile)\b")
+      or (FileName =~ "mshta.exe" and ProcessCommandLine matches regex @"(?i)https?://|javascript:|vbscript:")
+      or (FileName =~ "regsvr32.exe" and ProcessCommandLine matches regex @"(?i)/i:\s*https?://|scrobj")
+      or (FileName in~ ("powershell.exe", "pwsh.exe")
+          and ProcessCommandLine matches regex @"(?i)downloadstring|downloadfile|downloaddata|invoke-webrequest|\biwr\b|invoke-restmethod|\birm\b|net\.webclient|start-bitstransfer"
+          and ProcessCommandLine matches regex @"(?i)\biex\b|invoke-expression|-outfile\s+\S+\.(exe|dll|ps1|hta|bat|vbs|js)|\.(exe|dll|ps1|hta)['""\s]*\)?\s*$")
+  | project TimeGenerated, DeviceName, AccountName, FileName, ProcessCommandLine, InitiatingProcessFileName, InitiatingProcessCommandLine
+entityMappings:
+  - entityType: Host
+    fieldMappings:
+      - identifier: HostName
+        columnName: DeviceName
+  - entityType: Account
+    fieldMappings:
+      - identifier: Name
+        columnName: AccountName
+version: 1.0.0
+kind: Scheduled

@@ -1,0 +1,42 @@
+id: 880d3927-ef52-4c3f-b340-1fdd8e3175de
+name: Per-user MFA disabled for an account
+description: |
+  Turning off per-user MFA lets the account sign in with a password alone wherever Conditional Access doesn't step in.
+  Attackers with admin rights do this to keep access to accounts they control.
+  Tuning: if you've moved fully to Conditional Access and are retiring per-user MFA, these changes are expected during
+  the migration; scope the alert to after the migration date.
+  Triage: confirm the change with the admin and the user. Re-enable MFA or confirm a Conditional Access policy covers the
+  account.
+severity: Medium
+requiredDataConnectors:
+  - connectorId: AzureActiveDirectory
+    dataTypes:
+      - AuditLogs
+queryFrequency: 1h
+queryPeriod: 1h
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - DefenseEvasion
+  - Persistence
+relevantTechniques:
+  - T1556.006
+query: |
+  AuditLogs
+  | where TimeGenerated > ago(1h)
+  | where OperationName == "Disable Strong Authentication" and Result =~ "success"
+  | extend TargetUser = tostring(TargetResources[0].userPrincipalName),
+      Actor = coalesce(tostring(InitiatedBy.user.userPrincipalName), tostring(InitiatedBy.app.displayName)),
+      ActorIP = tostring(InitiatedBy.user.ipAddress)
+  | project TimeGenerated, TargetUser, Actor, ActorIP
+entityMappings:
+  - entityType: Account
+    fieldMappings:
+      - identifier: FullName
+        columnName: TargetUser
+  - entityType: Account
+    fieldMappings:
+      - identifier: FullName
+        columnName: Actor
+version: 1.0.0
+kind: Scheduled

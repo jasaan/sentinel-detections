@@ -1,0 +1,41 @@
+id: 7722b4c2-2b4a-4464-950e-777ebc277dd8
+name: Burst of AccessDenied errors across many AWS APIs from one identity
+description: |
+  When attackers get a new set of AWS keys, they don't know what the keys can do, so they try a wide range of List,
+  Describe and Get calls and collect the failures. Twenty-five or more access-denied errors across ten or more APIs in
+  an hour is that pattern; a broken app usually fails the same one or two calls over and over.
+  Seen in: Pacu, ScoutSuite-style enumeration with stolen keys, and the "enumerate-iam" approach seen in cloud
+  credential-theft campaigns.
+  Tuning: CSPM and security scanners with deliberately narrow permissions can do this; exclude their role ARNs.
+  Triage: find where the key came from (leaked in code? an instance profile?), check the source IP and user agent, and
+  deactivate or rotate the credentials if the activity isn't yours.
+severity: Medium
+requiredDataConnectors:
+  - connectorId: AWS
+    dataTypes:
+      - AWSCloudTrail
+queryFrequency: 1h
+queryPeriod: 1h
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - Discovery
+relevantTechniques:
+  - T1580
+  - T1087.004
+  - T1069.003
+query: |
+  AWSCloudTrail
+  | where TimeGenerated > ago(1h)
+  | where ErrorCode in ("AccessDenied", "AccessDeniedException", "UnauthorizedOperation", "Client.UnauthorizedOperation", "UnauthorizedAccess")
+  | summarize Errors = count(), DistinctApis = dcount(EventName), Apis = make_set(EventName, 30), Services = make_set(EventSource, 20),
+      IPs = make_set(SourceIpAddress, 10), UserAgents = make_set(UserAgent, 5), FirstSeen = min(TimeGenerated), LastSeen = max(TimeGenerated)
+      by UserIdentityArn, RecipientAccountId
+  | where Errors >= 25 and DistinctApis >= 10
+entityMappings:
+  - entityType: Account
+    fieldMappings:
+      - identifier: Name
+        columnName: UserIdentityArn
+version: 1.0.0
+kind: Scheduled

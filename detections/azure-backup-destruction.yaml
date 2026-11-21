@@ -1,0 +1,44 @@
+id: c7fa386e-a1d1-4b06-bbe1-fc20a0ffa039
+name: Azure backup protection removed or backup vault deleted
+description: |
+  Ransomware crews delete or disable backups before encrypting so the victim can't restore. In Azure that means
+  stopping protection on backed-up items, changing a vault's soft-delete or immutability settings, or deleting vaults.
+  Seen in: Storm-0501 cloud ransomware (2024-2025), which deleted Azure backups before mass deletion and encryption.
+  Tuning: decommissioning a VM stops its protection; those changes should match a change ticket.
+  Triage: check soft-deleted backup items (they can be restored for 14 days by default), lock the vault with
+  immutability and multi-user authorization, and investigate the caller.
+severity: High
+requiredDataConnectors:
+  - connectorId: AzureActivity
+    dataTypes:
+      - AzureActivity
+queryFrequency: 1h
+queryPeriod: 1h
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - Impact
+relevantTechniques:
+  - T1490
+query: |
+  let BackupOps = dynamic(["MICROSOFT.RECOVERYSERVICES/VAULTS/DELETE",
+      "MICROSOFT.RECOVERYSERVICES/VAULTS/BACKUPFABRICS/PROTECTIONCONTAINERS/PROTECTEDITEMS/DELETE",
+      "MICROSOFT.RECOVERYSERVICES/VAULTS/BACKUPCONFIG/WRITE", "MICROSOFT.RECOVERYSERVICES/VAULTS/BACKUPPOLICIES/DELETE",
+      "MICROSOFT.DATAPROTECTION/BACKUPVAULTS/DELETE", "MICROSOFT.DATAPROTECTION/BACKUPVAULTS/BACKUPINSTANCES/DELETE",
+      "MICROSOFT.DATAPROTECTION/BACKUPVAULTS/BACKUPPOLICIES/DELETE"]);
+  AzureActivity
+  | where TimeGenerated > ago(1h)
+  | where OperationNameValue in~ (BackupOps) and ActivityStatusValue in~ ("Success", "Succeeded")
+  | summarize FirstSeen = min(TimeGenerated), Operations = make_set(OperationNameValue), Resources = make_set(_ResourceId, 20),
+      Count = count() by Caller, CallerIpAddress, SubscriptionId
+entityMappings:
+  - entityType: Account
+    fieldMappings:
+      - identifier: FullName
+        columnName: Caller
+  - entityType: IP
+    fieldMappings:
+      - identifier: Address
+        columnName: CallerIpAddress
+version: 1.0.0
+kind: Scheduled

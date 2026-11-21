@@ -1,0 +1,12 @@
+rule: detections/privileged-ad-group-member-added.yaml
+description: Adding a user to Domain Admins fires; adding one to a Marketing group doesn't.
+data:
+  SecurityEvent:
+    - {ago: 15m, EventID: 4728, Computer: dc01.contoso.local, TargetUserName: Domain Admins, MemberName: "CN=helpdesk2,OU=Staff,DC=contoso,DC=local", SubjectUserName: mallory}
+    - {ago: 15m, EventID: 4728, Computer: dc01.contoso.local, TargetUserName: Marketing, MemberName: "CN=newhire,OU=Staff,DC=contoso,DC=local", SubjectUserName: hr-sync}
+expect:
+  rows: 1
+  include:
+    - {Group: Domain Admins, AddedBy: mallory}
+  exclude:
+    - {Group: Marketing}

@@ -1,0 +1,12 @@
+rule: detections/transport-rule-redirects-mail.yaml
+description: A transport rule that BCCs an outside address fires; a disclaimer rule doesn't.
+data:
+  OfficeActivity:
+    - {ago: 15m, Operation: New-TransportRule, OfficeWorkload: Exchange, UserId: admin1@contoso.com, ClientIP: 198.51.100.26, Parameters: '[{"Name":"Name","Value":"Compliance copy"},{"Name":"SentToScope","Value":"InOrganization"},{"Name":"BlindCopyTo","Value":"archive@mail.example.net"}]'}
+    - {ago: 15m, Operation: New-TransportRule, OfficeWorkload: Exchange, UserId: admin2@contoso.com, ClientIP: 203.0.113.26, Parameters: '[{"Name":"Name","Value":"External disclaimer"},{"Name":"ApplyHtmlDisclaimerText","Value":"Sent from Contoso"}]'}
+expect:
+  rows: 1
+  include:
+    - {Actor: admin1@contoso.com, RuleName: Compliance copy}
+  exclude:
+    - {Actor: admin2@contoso.com}

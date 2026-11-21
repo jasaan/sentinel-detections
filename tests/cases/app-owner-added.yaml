@@ -1,0 +1,12 @@
+rule: detections/app-owner-added.yaml
+description: Adding an owner to an app registration fires; updating the app doesn't.
+data:
+  AuditLogs:
+    - {ago: 10m, OperationName: Add owner to application, Result: success, Category: ApplicationManagement, InitiatedBy: {user: {userPrincipalName: dev1@contoso.com}}, TargetResources: [{userPrincipalName: mallory@contoso.com}, {displayName: PayrollExport, id: app-obj-1}]}
+    - {ago: 10m, OperationName: Update application, Result: success, Category: ApplicationManagement, InitiatedBy: {user: {userPrincipalName: dev2@contoso.com}}, TargetResources: [{displayName: PayrollExport, id: app-obj-1}]}
+expect:
+  rows: 1
+  include:
+    - {NewOwner: mallory@contoso.com, App: PayrollExport}
+  exclude:
+    - {Actor: dev2@contoso.com}

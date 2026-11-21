@@ -1,0 +1,14 @@
+rule: detections/legacy-auth-success.yaml
+description: A successful IMAP sign-in fires; a browser sign-in and a failed SMTP AUTH attempt don't.
+data:
+  SigninLogs:
+    - {ago: 15m, UserPrincipalName: alice@contoso.com, ResultType: "0", ClientAppUsed: IMAP4, IPAddress: 198.51.100.12, Location: DE}
+    - {ago: 15m, UserPrincipalName: bob@contoso.com, ResultType: "0", ClientAppUsed: Browser, IPAddress: 203.0.113.12, Location: US}
+    - {ago: 15m, UserPrincipalName: carol@contoso.com, ResultType: "50126", ClientAppUsed: Authenticated SMTP, IPAddress: 198.51.100.13, Location: DE}
+expect:
+  rows: 1
+  include:
+    - {UserPrincipalName: alice@contoso.com, ClientAppUsed: IMAP4}
+  exclude:
+    - {UserPrincipalName: bob@contoso.com}
+    - {UserPrincipalName: carol@contoso.com}

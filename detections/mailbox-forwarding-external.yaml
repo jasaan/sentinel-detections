@@ -1,0 +1,48 @@
+id: a10dd423-91f5-4c23-b512-2a7f65096dca
+name: Mailbox-level forwarding set to an external address
+description: |
+  Set-Mailbox -ForwardingSmtpAddress copies every incoming message to another address. Unlike an inbox rule it doesn't
+  show in Outlook's rules list, so users rarely notice it. The inbox-rule forwarding rule doesn't see this.
+  Tuning: set OrgDomains to all of your accepted domains. Outbound spam policy can block automatic external forwarding
+  outright; if you've done that, this rule still shows the attempt.
+  Triage: confirm with the user and their manager. Remove the forward (Set-Mailbox -ForwardingSmtpAddress $null),
+  check who made the change and from where, and look at what was forwarded through message trace.
+severity: High
+requiredDataConnectors:
+  - connectorId: Office365
+    dataTypes:
+      - OfficeActivity
+queryFrequency: 1h
+queryPeriod: 1h
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - Collection
+  - Exfiltration
+relevantTechniques:
+  - T1114.003
+query: |
+  let OrgDomains = dynamic(["contoso.com"]);
+  OfficeActivity
+  | where TimeGenerated > ago(1h)
+  | where Operation =~ "Set-Mailbox"
+  | mv-apply P = todynamic(Parameters) on (
+      summarize Params = make_bag(bag_pack(tostring(P.Name), tostring(P.Value)))
+    )
+  | extend Mailbox = tostring(Params.Identity),
+      ForwardTo = trim(@"\s", replace_regex(coalesce(tostring(Params.ForwardingSmtpAddress), tostring(Params.ForwardingAddress)), @"(?i)^smtp:", ""))
+  | extend ForwardDomain = tolower(tostring(split(ForwardTo, "@")[1]))
+  | where isnotempty(ForwardDomain) and not(ForwardDomain in (OrgDomains))
+  | project TimeGenerated, Actor = UserId, ClientIP, Mailbox, ForwardTo, ForwardDomain,
+      KeepsCopy = tostring(Params.DeliverToMailboxAndForward)
+entityMappings:
+  - entityType: Account
+    fieldMappings:
+      - identifier: FullName
+        columnName: Actor
+  - entityType: MailMessage
+    fieldMappings:
+      - identifier: Recipient
+        columnName: ForwardTo
+version: 1.0.0
+kind: Scheduled

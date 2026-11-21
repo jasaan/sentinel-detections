@@ -1,0 +1,15 @@
+rule: hunting/hunt-aws-access-key-new-ip.yaml
+description: A CI user's key used from a new IP shows up; the same user from its usual IP and a brand-new user don't.
+data:
+  AWSCloudTrail:
+    - {ago: 7d, EventName: PutObject, EventSource: s3.amazonaws.com, UserIdentityType: IAMUser, UserIdentityArn: "arn:aws:iam::123456789012:user/ci-deploy", SourceIpAddress: 203.0.113.167, UserAgent: "aws-cli/2.15"}
+    - {ago: 3h, EventName: PutObject, EventSource: s3.amazonaws.com, UserIdentityType: IAMUser, UserIdentityArn: "arn:aws:iam::123456789012:user/ci-deploy", SourceIpAddress: 203.0.113.167, UserAgent: "aws-cli/2.15"}
+    - {ago: 2h, _repeat: 6, _step: 10s, EventName: ListUsers, EventSource: iam.amazonaws.com, UserIdentityType: IAMUser, UserIdentityArn: "arn:aws:iam::123456789012:user/ci-deploy", SourceIpAddress: 198.51.100.167, UserAgent: "python-requests/2.31", ErrorCode: AccessDenied}
+    - {ago: 2h, EventName: GetCallerIdentity, EventSource: sts.amazonaws.com, UserIdentityType: IAMUser, UserIdentityArn: "arn:aws:iam::123456789012:user/new-hire", SourceIpAddress: 198.51.100.168, UserAgent: "aws-cli/2.15"}
+expect:
+  rows: 1
+  include:
+    - {UserIdentityArn: "arn:aws:iam::123456789012:user/ci-deploy", SourceIpAddress: 198.51.100.167, Errors: 6}
+  exclude:
+    - {SourceIpAddress: 203.0.113.167}
+    - {UserIdentityArn: "arn:aws:iam::123456789012:user/new-hire"}

@@ -1,0 +1,53 @@
+id: 57f471d7-965c-481c-be02-a920bde8b7e4
+name: Owner or User Access Administrator assigned in Azure RBAC
+description: |
+  Owner, User Access Administrator and Role Based Access Control Administrator can grant any access, so an assignment
+  of one of them is a privilege-escalation or persistence step unless it was planned. This catches assignments made
+  directly in Azure RBAC, which the Entra role rules don't see.
+  Tuning: if you use PIM for Azure resources, activations also write role assignments; exclude the PIM service caller
+  (it appears as an MS-PIM principal) or alert only on assignments at subscription or management-group scope.
+  Triage: check the principal that received the role (a new guest or service principal is the worst case), the scope,
+  and who assigned it. Remove it if it isn't tied to a change.
+severity: High
+requiredDataConnectors:
+  - connectorId: AzureActivity
+    dataTypes:
+      - AzureActivity
+queryFrequency: 1h
+queryPeriod: 1h
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - PrivilegeEscalation
+  - Persistence
+relevantTechniques:
+  - T1098.003
+query: |
+  let PrivilegedRoles = datatable(RoleId: string, RoleName: string) [
+      "8e3af657-a8ff-443c-a75c-2fe8c4bcb635", "Owner",
+      "18d7d88d-d35e-4fb5-a5c3-7773c20a72d9", "User Access Administrator",
+      "f58310d9-a9f6-439a-9e8d-f62e7b41a168", "Role Based Access Control Administrator"
+  ];
+  AzureActivity
+  | where TimeGenerated > ago(1h)
+  | where OperationNameValue =~ "MICROSOFT.AUTHORIZATION/ROLEASSIGNMENTS/WRITE"
+  | where ActivityStatusValue !in~ ("Failure", "Failed")
+  | extend Body = tostring(Properties_d)
+  | extend RoleId = tolower(extract(@"roleDefinitions/([0-9a-fA-F\-]{36})", 1, Body)),
+      PrincipalId = extract(@"(?i)principalId\\?""?\s*:\s*\\?""([0-9a-fA-F\-]{36})", 1, Body),
+      PrincipalType = extract(@"(?i)principalType\\?""?\s*:\s*\\?""(\w+)", 1, Body)
+  | join kind=inner PrivilegedRoles on RoleId
+  | summarize FirstSeen = min(TimeGenerated), PrincipalId = take_any(PrincipalId), PrincipalType = take_any(PrincipalType)
+      by Caller, CallerIpAddress, RoleName, Scope = _ResourceId
+  | extend AtSubscriptionOrAbove = Scope !contains "/resourcegroups/"
+entityMappings:
+  - entityType: Account
+    fieldMappings:
+      - identifier: FullName
+        columnName: Caller
+  - entityType: AzureResource
+    fieldMappings:
+      - identifier: ResourceId
+        columnName: Scope
+version: 1.0.0
+kind: Scheduled

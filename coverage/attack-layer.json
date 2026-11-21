@@ -1,0 +1,526 @@
+{
+  "name": "sentinel-detections coverage",
+  "versions": {
+    "attack": "16",
+    "navigator": "5.1.0",
+    "layer": "4.5"
+  },
+  "domain": "enterprise-attack",
+  "description": "Techniques covered by the detection rules and hunting queries in github.com/jasaan/sentinel-detections. Score = number of rules and hunts that map to the technique.",
+  "techniques": [
+    {
+      "techniqueID": "T1003.001",
+      "score": 1,
+      "comment": "Rule: LSASS memory dump by command line",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1003.002",
+      "score": 1,
+      "comment": "Rule: SAM, SECURITY or SYSTEM registry hive saved to disk",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1003.003",
+      "score": 1,
+      "comment": "Rule: Active Directory database (NTDS.dit) extraction",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1003.004",
+      "score": 1,
+      "comment": "Rule: SAM, SECURITY or SYSTEM registry hive saved to disk",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1003.006",
+      "score": 1,
+      "comment": "Rule: Directory replication requested by an account that isn't a domain controller (DCSync)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1021.001",
+      "score": 1,
+      "comment": "Hunt: One account logging on to many devices over the network",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1021.002",
+      "score": 2,
+      "comment": "Hunt: One account logging on to many devices over the network; Rule: Impacket-style remote execution (wmiexec, smbexec, DCOM)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1021.003",
+      "score": 1,
+      "comment": "Rule: Impacket-style remote execution (wmiexec, smbexec, DCOM)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1027.010",
+      "score": 1,
+      "comment": "Rule: PowerShell run with a long encoded command",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1036.003",
+      "score": 1,
+      "comment": "Rule: Cloud sync tool used to copy data out (rclone, MEGA, restic)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1047",
+      "score": 1,
+      "comment": "Rule: Impacket-style remote execution (wmiexec, smbexec, DCOM)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1053.005",
+      "score": 1,
+      "comment": "Rule: Scheduled task created that runs a script host, LOLBin or file from a user-writable folder",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1059.001",
+      "score": 1,
+      "comment": "Rule: PowerShell run with a long encoded command",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1059.004",
+      "score": 1,
+      "comment": "Rule: Reverse shell command line on Linux",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1059.006",
+      "score": 1,
+      "comment": "Rule: Reverse shell command line on Linux",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1059.009",
+      "score": 1,
+      "comment": "Hunt: First use of Azure or Graph command-line tools by a user",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1069.002",
+      "score": 1,
+      "comment": "Rule: Active Directory reconnaissance (AdFind, SharpHound or several discovery commands)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1069.003",
+      "score": 2,
+      "comment": "Rule: Broad directory enumeration through Microsoft Graph; Rule: Burst of AccessDenied errors across many AWS APIs from one identity",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1070.001",
+      "score": 1,
+      "comment": "Rule: Windows event log or audit policy cleared",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1070.008",
+      "score": 2,
+      "comment": "Hunt: Large numbers of mail items deleted from a mailbox; Rule: Compliance search exported or used to purge mail",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1071.001",
+      "score": 1,
+      "comment": "Hunt: Regular-interval connections to a public IP (C2 beaconing)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1078.002",
+      "score": 2,
+      "comment": "Hunt: One account logging on to many devices over the network; Rule: Entra Connect sync account used outside directory sync",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1078.004",
+      "score": 15,
+      "comment": "Hunt: AWS IAM user's access key used from a new IP; Hunt: Blocked by Conditional Access, then signed in elsewhere with a password only; Hunt: Dormant account signs in again; Hunt: Successful sign-ins with rarely seen user agents; Rule: AWS console sign-in by an IAM user without MFA; Rule: AWS root user activity; Rule: Admin reset of password or MFA followed by sign-in from a new IP; Rule: Break-glass account sign-in attempt; Rule: Entra Connect sync account used outside directory sync; Rule: Global Administrator elevated access to all Azure subscriptions; Rule: High-risk sign-in succeeded with a password only; Rule: New MFA method followed by sign-in from a new country; Rule: Repeated failed passwords then a successful sign-in from the same IP; Rule: Service principal signs in from a new country; Rule: Successful sign-in over legacy authentication",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1087.002",
+      "score": 1,
+      "comment": "Rule: Active Directory reconnaissance (AdFind, SharpHound or several discovery commands)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1087.004",
+      "score": 3,
+      "comment": "Hunt: First use of Azure or Graph command-line tools by a user; Rule: Broad directory enumeration through Microsoft Graph; Rule: Burst of AccessDenied errors across many AWS APIs from one identity",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1098",
+      "score": 1,
+      "comment": "Rule: New owner added to an application or service principal",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1098.001",
+      "score": 4,
+      "comment": "Hunt: New credentials added to an app or service principal; Hunt: Storage account keys listed by a new caller; Rule: AWS access key created for a different IAM user; Rule: New IAM user created and given credentials in the same session",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1098.002",
+      "score": 1,
+      "comment": "Rule: Full Access or Send As granted on a mailbox",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1098.003",
+      "score": 5,
+      "comment": "Rule: AWS administrator-level policy attached or written; Rule: Application granted a high-privilege Microsoft Graph application permission; Rule: Global Administrator elevated access to all Azure subscriptions; Rule: Owner or User Access Administrator assigned in Azure RBAC; Rule: Privileged Entra role assigned outside PIM",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1098.005",
+      "score": 2,
+      "comment": "Rule: Admin reset of password or MFA followed by sign-in from a new IP; Rule: New MFA method followed by sign-in from a new country",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1098.007",
+      "score": 1,
+      "comment": "Rule: Member added to a privileged Active Directory group",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1105",
+      "score": 1,
+      "comment": "Rule: File downloaded with a built-in Windows tool",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1110.001",
+      "score": 2,
+      "comment": "Rule: Brute force against a device from a public IP (RDP, SMB or SSH); Rule: Repeated failed passwords then a successful sign-in from the same IP",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1110.003",
+      "score": 3,
+      "comment": "Rule: Distributed password spray from many unfamiliar IPs; Rule: Password spray against Entra ID from a single IP; Rule: Successful sign-in over legacy authentication",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1114.002",
+      "score": 4,
+      "comment": "Hunt: Apps granted access to mailboxes; Rule: Compliance search exported or used to purge mail; Rule: Full Access or Send As granted on a mailbox; Rule: Inbox rule hides mail about payments or security",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1114.003",
+      "score": 3,
+      "comment": "Rule: Exchange transport rule copies, redirects or deletes mail; Rule: Inbox rule forwards mail to an external address; Rule: Mailbox-level forwarding set to an external address",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1133",
+      "score": 2,
+      "comment": "Rule: Brute force against a device from a public IP (RDP, SMB or SSH); Rule: Network security group rule opens RDP, SSH or WinRM to the internet",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1136.003",
+      "score": 1,
+      "comment": "Rule: New IAM user created and given credentials in the same session",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1190",
+      "score": 1,
+      "comment": "Rule: Web server process starts a shell or reconnaissance command (possible web shell)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1204.001",
+      "score": 1,
+      "comment": "Rule: User clicked a link in a delivered phishing email",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1204.002",
+      "score": 2,
+      "comment": "Hunt: Rare executables run from user-writable folders; Rule: Office application launches a shell, script host or LOLBin",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1213.002",
+      "score": 2,
+      "comment": "Hunt: Bulk download from a SharePoint site the user hasn't used before; Rule: Burst of anonymous \"anyone with the link\" sharing links",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1218",
+      "score": 1,
+      "comment": "Rule: File downloaded with a built-in Windows tool",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1219",
+      "score": 1,
+      "comment": "Rule: Remote access (RMM) tool runs on a device for the first time",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1482",
+      "score": 1,
+      "comment": "Rule: Active Directory reconnaissance (AdFind, SharpHound or several discovery commands)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1484.002",
+      "score": 2,
+      "comment": "Rule: Cross-tenant access or sync settings changed; Rule: Domain federation settings changed in Entra ID",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1485",
+      "score": 3,
+      "comment": "Hunt: Large numbers of mail items deleted from a mailbox; Rule: AWS KMS key disabled or scheduled for deletion; Rule: Mass deletion of Azure resources by one caller",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1486",
+      "score": 2,
+      "comment": "Rule: AWS KMS key disabled or scheduled for deletion; Rule: Mass file renaming to a new extension (possible ransomware encryption)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1490",
+      "score": 2,
+      "comment": "Rule: Azure backup protection removed or backup vault deleted; Rule: Shadow copy or backup catalog deletion",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1496",
+      "score": 2,
+      "comment": "Hunt: AWS resources created in a region the account doesn't normally use; Rule: Cryptocurrency miner started",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1505.003",
+      "score": 1,
+      "comment": "Rule: Web server process starts a shell or reconnaissance command (possible web shell)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1526",
+      "score": 1,
+      "comment": "Rule: Broad directory enumeration through Microsoft Graph",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1528",
+      "score": 3,
+      "comment": "Hunt: Apps granted access to mailboxes; Rule: Consent granted to an app with high-risk permissions; Rule: Device code sign-in by a user who doesn't normally use it",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1530",
+      "score": 3,
+      "comment": "Hunt: Bulk download from a SharePoint site the user hasn't used before; Rule: Mass file download from SharePoint or OneDrive; Rule: S3 bucket made public or its public access block removed",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1531",
+      "score": 1,
+      "comment": "Rule: Mass deletion of users, groups or apps in Entra ID",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1534",
+      "score": 1,
+      "comment": "Rule: Account suddenly emails far more recipients than usual",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1535",
+      "score": 1,
+      "comment": "Hunt: AWS resources created in a region the account doesn't normally use",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1537",
+      "score": 2,
+      "comment": "Rule: EBS, AMI or RDS snapshot shared with another account or made public; Rule: S3 bucket made public or its public access block removed",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1539",
+      "score": 1,
+      "comment": "Rule: Same sign-in session used from two countries (possible AiTM token theft)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1543.003",
+      "score": 1,
+      "comment": "Rule: Service created that runs a shell, script or binary from a user-writable folder",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1547.001",
+      "score": 1,
+      "comment": "Rule: Run key or Winlogon value points to a script host or user-writable folder",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1550.004",
+      "score": 1,
+      "comment": "Rule: Same sign-in session used from two countries (possible AiTM token theft)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1552.001",
+      "score": 2,
+      "comment": "Hunt: AWS IAM user's access key used from a new IP; Hunt: Storage account keys listed by a new caller",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1555.006",
+      "score": 2,
+      "comment": "Rule: Many AWS secrets retrieved by one identity; Rule: Mass secret retrieval from Azure Key Vault",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1556.006",
+      "score": 1,
+      "comment": "Rule: Per-user MFA disabled for an account",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1556.009",
+      "score": 3,
+      "comment": "Hunt: Blocked by Conditional Access, then signed in elsewhere with a password only; Rule: Conditional Access named location added, changed or deleted; Rule: Conditional Access policy deleted or disabled",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1557",
+      "score": 1,
+      "comment": "Rule: Same sign-in session used from two countries (possible AiTM token theft)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1558.003",
+      "score": 1,
+      "comment": "Rule: Kerberoasting (many RC4 service tickets requested by one account)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1562.001",
+      "score": 2,
+      "comment": "Rule: AMSI bypass strings in a command line; Rule: Microsoft Defender protections disabled or excluded from the command line",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1562.002",
+      "score": 1,
+      "comment": "Rule: Windows event log or audit policy cleared",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1562.007",
+      "score": 1,
+      "comment": "Rule: Network security group rule opens RDP, SSH or WinRM to the internet",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1562.008",
+      "score": 3,
+      "comment": "Rule: AWS CloudTrail, GuardDuty, Config or flow logs disabled; Rule: Azure diagnostic settings, Log Analytics workspace or Sentinel rules deleted; Rule: Microsoft 365 audit logging turned off or bypassed",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1564.008",
+      "score": 2,
+      "comment": "Rule: Exchange transport rule copies, redirects or deletes mail; Rule: Inbox rule hides mail about payments or security",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1566.001",
+      "score": 2,
+      "comment": "Rule: Email with a high-risk attachment type delivered to the inbox; Rule: Office application launches a shell, script host or LOLBin",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1566.002",
+      "score": 4,
+      "comment": "Hunt: Users clicked links in mail from a sender domain never seen before; Rule: Account suddenly emails far more recipients than usual; Rule: Device code sign-in by a user who doesn't normally use it; Rule: User clicked a link in a delivered phishing email",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1567",
+      "score": 1,
+      "comment": "Rule: Burst of anonymous \"anyone with the link\" sharing links",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1567.002",
+      "score": 1,
+      "comment": "Rule: Cloud sync tool used to copy data out (rclone, MEGA, restic)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1569.002",
+      "score": 1,
+      "comment": "Rule: Service created that runs a shell, script or binary from a user-writable folder",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1573",
+      "score": 1,
+      "comment": "Hunt: Regular-interval connections to a public IP (C2 beaconing)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1580",
+      "score": 1,
+      "comment": "Rule: Burst of AccessDenied errors across many AWS APIs from one identity",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1583.001",
+      "score": 1,
+      "comment": "Hunt: Users clicked links in mail from a sender domain never seen before",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1621",
+      "score": 1,
+      "comment": "Hunt: MFA fatigue (repeated push denials)",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1651",
+      "score": 1,
+      "comment": "Rule: VM Run Command used by an account that hasn't used it before",
+      "enabled": true
+    },
+    {
+      "techniqueID": "T1656",
+      "score": 1,
+      "comment": "Rule: Admin reset of password or MFA followed by sign-in from a new IP",
+      "enabled": true
+    }
+  ],
+  "gradient": {
+    "colors": [
+      "#d0e6ff",
+      "#1f6feb"
+    ],
+    "minValue": 1,
+    "maxValue": 15
+  },
+  "showTacticRowBackground": true,
+  "selectSubtechniquesWithParent": false
+}

@@ -1,0 +1,44 @@
+id: bf1664e4-40c7-4d0e-83dc-8a558275d483
+name: Domain federation settings changed in Entra ID
+description: |
+  Changing a domain to federated, or changing its federation settings, lets whoever controls the identity provider
+  sign in as any user in that domain, MFA included. Attackers with Global Admin add their own IdP as a persistent
+  backdoor that survives password resets.
+  Seen in: Octo Tempest / Scattered Spider, and Golden SAML-style persistence after the SolarWinds intrusion.
+  Tuning: legitimate federation changes are rare and planned; match each alert to a change ticket.
+  Triage: check which domain changed, who did it and from where. If unplanned, revert the domain to managed
+  authentication, rotate the admin's credentials and review all Global Admin activity in the same session.
+severity: High
+requiredDataConnectors:
+  - connectorId: AzureActiveDirectory
+    dataTypes:
+      - AuditLogs
+queryFrequency: 1h
+queryPeriod: 1h
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - Persistence
+  - PrivilegeEscalation
+  - DefenseEvasion
+relevantTechniques:
+  - T1484.002
+query: |
+  AuditLogs
+  | where TimeGenerated > ago(1h)
+  | where OperationName in ("Set domain authentication", "Set federation settings on domain") and Result =~ "success"
+  | extend Domain = tostring(TargetResources[0].displayName),
+      Actor = coalesce(tostring(InitiatedBy.user.userPrincipalName), tostring(InitiatedBy.app.displayName)),
+      ActorIP = tostring(InitiatedBy.user.ipAddress)
+  | project TimeGenerated, OperationName, Domain, Actor, ActorIP
+entityMappings:
+  - entityType: Account
+    fieldMappings:
+      - identifier: FullName
+        columnName: Actor
+  - entityType: IP
+    fieldMappings:
+      - identifier: Address
+        columnName: ActorIP
+version: 1.0.0
+kind: Scheduled

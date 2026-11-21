@@ -1,0 +1,12 @@
+rule: detections/aws-access-denied-recon-burst.yaml
+description: Thirty denials across thirty APIs fire; forty denials on one API (a misconfigured app) don't.
+data:
+  AWSCloudTrail:
+    - {ago: 40m, _repeat: 30, _step: 20s, EventName: "ListThing{i}", EventSource: iam.amazonaws.com, ErrorCode: AccessDenied, UserIdentityType: IAMUser, UserIdentityArn: "arn:aws:iam::123456789012:user/ci-deploy", RecipientAccountId: "123456789012", SourceIpAddress: 198.51.100.129, UserAgent: "Boto3/1.34 Python/3.11"}
+    - {ago: 40m, _repeat: 40, _step: 20s, EventName: GetObject, EventSource: s3.amazonaws.com, ErrorCode: AccessDenied, UserIdentityType: AssumedRole, UserIdentityArn: "arn:aws:sts::123456789012:assumed-role/app/i-0abc", RecipientAccountId: "123456789012", SourceIpAddress: 203.0.113.129, UserAgent: "aws-sdk-java/2.20"}
+expect:
+  rows: 1
+  include:
+    - {UserIdentityArn: "arn:aws:iam::123456789012:user/ci-deploy", Errors: 30}
+  exclude:
+    - {UserIdentityArn: "arn:aws:sts::123456789012:assumed-role/app/i-0abc"}

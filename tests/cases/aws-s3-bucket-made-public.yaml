@@ -1,0 +1,16 @@
+rule: detections/aws-s3-bucket-made-public.yaml
+description: A Principal "*" policy and a deleted public access block fire; a policy for one account and the allow-listed website bucket don't.
+data:
+  AWSCloudTrail:
+    - {ago: 20m, EventName: PutBucketPolicy, EventSource: s3.amazonaws.com, UserIdentityArn: "arn:aws:iam::123456789012:user/mallory", RecipientAccountId: "123456789012", SourceIpAddress: 198.51.100.127, RequestParameters: '{"bucketName":"finance-exports","bucketPolicy":{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":"*","Action":"s3:GetObject","Resource":"arn:aws:s3:::finance-exports/*"}]}}'}
+    - {ago: 20m, EventName: DeleteBucketPublicAccessBlock, EventSource: s3.amazonaws.com, UserIdentityArn: "arn:aws:iam::123456789012:user/mallory", RecipientAccountId: "123456789012", SourceIpAddress: 198.51.100.127, RequestParameters: '{"bucketName":"hr-archive","publicAccessBlock":""}'}
+    - {ago: 20m, EventName: PutBucketPolicy, EventSource: s3.amazonaws.com, UserIdentityArn: "arn:aws:iam::123456789012:user/alice", RecipientAccountId: "123456789012", SourceIpAddress: 203.0.113.127, RequestParameters: '{"bucketName":"shared-logs","bucketPolicy":{"Statement":[{"Effect":"Allow","Principal":{"AWS":"arn:aws:iam::210987654321:root"},"Action":"s3:PutObject","Resource":"arn:aws:s3:::shared-logs/*"}]}}'}
+    - {ago: 20m, EventName: PutBucketPolicy, EventSource: s3.amazonaws.com, UserIdentityArn: "arn:aws:iam::123456789012:user/web", RecipientAccountId: "123456789012", SourceIpAddress: 203.0.113.128, RequestParameters: '{"bucketName":"www.contoso.example","bucketPolicy":{"Statement":[{"Effect":"Allow","Principal":"*","Action":"s3:GetObject","Resource":"arn:aws:s3:::www.contoso.example/*"}]}}'}
+expect:
+  rows: 2
+  include:
+    - {Bucket: finance-exports, Change: Public bucket policy}
+    - {Bucket: hr-archive, Change: Public access block deleted}
+  exclude:
+    - {Bucket: shared-logs}
+    - {Bucket: www.contoso.example}

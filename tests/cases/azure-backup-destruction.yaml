@@ -1,0 +1,13 @@
+rule: detections/azure-backup-destruction.yaml
+description: Stopping protection and deleting a vault fire; reading backup jobs doesn't.
+data:
+  AzureActivity:
+    - {ago: 20m, OperationNameValue: MICROSOFT.RECOVERYSERVICES/VAULTS/BACKUPFABRICS/PROTECTIONCONTAINERS/PROTECTEDITEMS/DELETE, ActivityStatusValue: Succeeded, Caller: mallory@contoso.com, CallerIpAddress: 198.51.100.106, SubscriptionId: sub-1, _ResourceId: /subscriptions/sub-1/resourceGroups/bk/providers/Microsoft.RecoveryServices/vaults/rsv1/item1}
+    - {ago: 15m, OperationNameValue: MICROSOFT.RECOVERYSERVICES/VAULTS/DELETE, ActivityStatusValue: Succeeded, Caller: mallory@contoso.com, CallerIpAddress: 198.51.100.106, SubscriptionId: sub-1, _ResourceId: /subscriptions/sub-1/resourceGroups/bk/providers/Microsoft.RecoveryServices/vaults/rsv1}
+    - {ago: 15m, OperationNameValue: MICROSOFT.RECOVERYSERVICES/VAULTS/BACKUPJOBS/READ, ActivityStatusValue: Succeeded, Caller: backup-admin@contoso.com, CallerIpAddress: 203.0.113.106, SubscriptionId: sub-1, _ResourceId: /subscriptions/sub-1/resourceGroups/bk/providers/Microsoft.RecoveryServices/vaults/rsv2}
+expect:
+  rows: 1
+  include:
+    - {Caller: mallory@contoso.com, Count: 2}
+  exclude:
+    - {Caller: backup-admin@contoso.com}

@@ -1,0 +1,43 @@
+id: 16ab4cc4-1d71-4fc6-9269-de19bd42978c
+name: Member added to a privileged Active Directory group
+description: |
+  Adding an account to Domain Admins, Enterprise Admins, Administrators or another built-in privileged group is the
+  usual way attackers make their access stick on-premises. These groups should change rarely, and through a process.
+  Tuning: if you use a privileged access management tool that adds members temporarily, exclude its service account
+  (SubjectUserName).
+  Triage: confirm with the person who made the change (SubjectUserName). If unapproved, remove the member, reset its
+  password, and review what the account did while privileged.
+severity: High
+requiredDataConnectors:
+  - connectorId: SecurityEvents
+    dataTypes:
+      - SecurityEvent
+queryFrequency: 1h
+queryPeriod: 1h
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - Persistence
+  - PrivilegeEscalation
+relevantTechniques:
+  - T1098.007
+query: |
+  let PrivilegedGroups = dynamic(["Domain Admins", "Enterprise Admins", "Schema Admins", "Administrators", "Account Operators",
+      "Backup Operators", "Server Operators", "Print Operators", "DnsAdmins", "Group Policy Creator Owners", "Enterprise Key Admins",
+      "Key Admins", "Exchange Windows Permissions", "Organization Management"]);
+  SecurityEvent
+  | where TimeGenerated > ago(1h)
+  | where EventID in (4728, 4732, 4756)
+  | where TargetUserName in~ (PrivilegedGroups)
+  | project TimeGenerated, Computer, Group = TargetUserName, Member = MemberName, AddedBy = SubjectUserName, EventID
+entityMappings:
+  - entityType: Account
+    fieldMappings:
+      - identifier: Name
+        columnName: AddedBy
+  - entityType: Host
+    fieldMappings:
+      - identifier: HostName
+        columnName: Computer
+version: 1.0.0
+kind: Scheduled

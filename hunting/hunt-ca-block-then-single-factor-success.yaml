@@ -1,0 +1,29 @@
+id: 6e4c3317-b9e8-4e5d-9ca2-83b52b87279f
+name: Blocked by Conditional Access, then signed in elsewhere with a password only
+description: |
+  Attackers holding a valid password often get blocked by Conditional Access on the first app they try, then probe
+  other apps, clients or protocols until one isn't covered. This hunt lists users with a CA failure followed later the
+  same day by a single-factor success.
+  How to hunt: compare the blocked apps with the successful ones. A success on an app or client your policies were
+  meant to cover is a policy gap to fix; a success from the same unfamiliar IP as the block is a compromised password.
+requiredDataConnectors:
+  - connectorId: AzureActiveDirectory
+    dataTypes:
+      - SigninLogs
+tactics:
+  - DefenseEvasion
+  - InitialAccess
+relevantTechniques:
+  - T1078.004
+  - T1556.009
+query: |
+  SigninLogs
+  | where TimeGenerated > ago(1d)
+  | extend SingleFactorSuccess = ResultType == "0" and AuthenticationRequirement =~ "singleFactorAuthentication",
+      CABlocked = ConditionalAccessStatus =~ "failure"
+  | summarize CAFailures = countif(CABlocked), FirstBlock = minif(TimeGenerated, CABlocked), BlockedApps = make_set_if(AppDisplayName, CABlocked, 10),
+      SingleFactorSuccesses = countif(SingleFactorSuccess), LastSingleFactor = maxif(TimeGenerated, SingleFactorSuccess),
+      SingleFactorApps = make_set_if(AppDisplayName, SingleFactorSuccess, 10), IPs = make_set(IPAddress, 10)
+      by UserPrincipalName = tolower(UserPrincipalName)
+  | where CAFailures > 0 and SingleFactorSuccesses > 0 and LastSingleFactor > FirstBlock
+  | order by CAFailures desc

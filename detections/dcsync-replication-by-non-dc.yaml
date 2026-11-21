@@ -1,0 +1,44 @@
+id: 8ecf51e7-5b0c-4b16-a113-bb9c7fd32e83
+name: Directory replication requested by an account that isn't a domain controller (DCSync)
+description: |
+  DCSync impersonates a domain controller and asks a real DC to replicate password data, giving the attacker every hash
+  in the domain (including krbtgt) without touching NTDS.dit. Only domain controllers, and the Entra Connect sync
+  account if you use password hash sync, should ever make these requests.
+  Seen in: Mimikatz lsadump::dcsync and Impacket secretsdump, used in most domain-wide compromises.
+  Tuning: requires "Audit Directory Service Access" with a SACL on the domain object. Machine accounts ending in $ are
+  excluded (domain controllers); the Entra Connect AD DS connector account (MSOL_*) is excluded, so add yours if it's
+  named differently.
+  Triage: treat as full domain compromise: identify the account and source host, then plan a krbtgt double reset and
+  privileged credential rotation.
+severity: High
+requiredDataConnectors:
+  - connectorId: SecurityEvents
+    dataTypes:
+      - SecurityEvent
+queryFrequency: 1h
+queryPeriod: 1h
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - CredentialAccess
+relevantTechniques:
+  - T1003.006
+query: |
+  let ReplicationRights = dynamic(["1131f6aa-9c07-11d1-f79f-00c04fc2dcd2", "1131f6ad-9c07-11d1-f79f-00c04fc2dcd2",
+      "89e95b76-444d-4c62-991a-0facbeda640c"]);
+  SecurityEvent
+  | where TimeGenerated > ago(1h)
+  | where EventID == 4662 and AccessMask == "0x100"
+  | extend Guids = extract_all(@"([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})", tolower(Properties))
+  | where array_length(set_intersect(Guids, ReplicationRights)) > 0
+  | where SubjectUserName !endswith "$" and SubjectUserName !startswith "MSOL_"
+  | summarize FirstSeen = min(TimeGenerated), Requests = count(), DomainControllers = make_set(Computer, 5) by SubjectUserName, SubjectUserSid
+entityMappings:
+  - entityType: Account
+    fieldMappings:
+      - identifier: Name
+        columnName: SubjectUserName
+      - identifier: Sid
+        columnName: SubjectUserSid
+version: 1.0.0
+kind: Scheduled

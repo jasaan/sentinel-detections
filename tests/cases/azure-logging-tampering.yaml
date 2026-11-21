@@ -1,0 +1,15 @@
+rule: detections/azure-logging-tampering.yaml
+description: Deleting a diagnostic setting and a Sentinel rule fires once for the caller; a failed delete and a diagnostic-setting write don't.
+data:
+  AzureActivity:
+    - {ago: 20m, OperationNameValue: MICROSOFT.INSIGHTS/DIAGNOSTICSETTINGS/DELETE, ActivityStatusValue: Success, Caller: mallory@contoso.com, CallerIpAddress: 198.51.100.100, SubscriptionId: sub-1, _ResourceId: /subscriptions/sub-1/resourceGroups/prod/providers/Microsoft.KeyVault/vaults/kv1/providers/microsoft.insights/diagnosticSettings/to-sentinel}
+    - {ago: 15m, OperationNameValue: Microsoft.SecurityInsights/alertRules/delete, ActivityStatusValue: Succeeded, Caller: mallory@contoso.com, CallerIpAddress: 198.51.100.100, SubscriptionId: sub-1, _ResourceId: /subscriptions/sub-1/resourceGroups/soc/providers/Microsoft.OperationalInsights/workspaces/sentinel/providers/Microsoft.SecurityInsights/alertRules/r1}
+    - {ago: 15m, OperationNameValue: MICROSOFT.INSIGHTS/DIAGNOSTICSETTINGS/DELETE, ActivityStatusValue: Failure, Caller: bob@contoso.com, CallerIpAddress: 203.0.113.100, SubscriptionId: sub-1, _ResourceId: /subscriptions/sub-1/x}
+    - {ago: 15m, OperationNameValue: MICROSOFT.INSIGHTS/DIAGNOSTICSETTINGS/WRITE, ActivityStatusValue: Success, Caller: carol@contoso.com, CallerIpAddress: 203.0.113.101, SubscriptionId: sub-1, _ResourceId: /subscriptions/sub-1/y}
+expect:
+  rows: 1
+  include:
+    - {Caller: mallory@contoso.com}
+  exclude:
+    - {Caller: bob@contoso.com}
+    - {Caller: carol@contoso.com}

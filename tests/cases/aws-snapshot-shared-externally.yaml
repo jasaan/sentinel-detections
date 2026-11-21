@@ -1,0 +1,16 @@
+rule: detections/aws-snapshot-shared-externally.yaml
+description: Sharing an EBS snapshot with an outside account and making an RDS snapshot public fire; sharing with a trusted account and removing a share don't.
+data:
+  AWSCloudTrail:
+    - {ago: 20m, EventName: ModifySnapshotAttribute, EventSource: ec2.amazonaws.com, UserIdentityArn: "arn:aws:iam::123456789012:user/mallory", RecipientAccountId: "123456789012", SourceIpAddress: 198.51.100.130, RequestParameters: '{"snapshotId":"snap-0aaa","attributeType":"CREATE_VOLUME_PERMISSION","createVolumePermission":{"add":{"items":[{"userId":"999988887777"}]}}}'}
+    - {ago: 20m, EventName: ModifyDBSnapshotAttribute, EventSource: rds.amazonaws.com, UserIdentityArn: "arn:aws:iam::123456789012:user/mallory", RecipientAccountId: "123456789012", SourceIpAddress: 198.51.100.130, RequestParameters: '{"dBSnapshotIdentifier":"prod-db-snap","attributeName":"restore","valuesToAdd":["all"]}'}
+    - {ago: 20m, EventName: ModifySnapshotAttribute, EventSource: ec2.amazonaws.com, UserIdentityArn: "arn:aws:iam::123456789012:role/backup", RecipientAccountId: "123456789012", SourceIpAddress: 203.0.113.130, RequestParameters: '{"snapshotId":"snap-0bbb","createVolumePermission":{"add":{"items":[{"userId":"111111111111"}]}}}'}
+    - {ago: 20m, EventName: ModifySnapshotAttribute, EventSource: ec2.amazonaws.com, UserIdentityArn: "arn:aws:iam::123456789012:user/alice", RecipientAccountId: "123456789012", SourceIpAddress: 203.0.113.131, RequestParameters: '{"snapshotId":"snap-0ccc","createVolumePermission":{"remove":{"items":[{"userId":"999988887777"}]}}}'}
+expect:
+  rows: 2
+  include:
+    - {Resource: snap-0aaa, SharedWith: "999988887777"}
+    - {Resource: prod-db-snap, Public: true}
+  exclude:
+    - {Resource: snap-0bbb}
+    - {Resource: snap-0ccc}

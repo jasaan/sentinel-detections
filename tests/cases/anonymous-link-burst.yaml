@@ -1,0 +1,14 @@
+rule: detections/anonymous-link-burst.yaml
+description: Twenty-five anonymous links in an hour fire; three links and many internal sharing events don't.
+data:
+  OfficeActivity:
+    - {ago: 40m, _repeat: 25, _step: 30s, Operation: AnonymousLinkCreated, OfficeWorkload: OneDrive, UserId: alice@contoso.com, ClientIP: 198.51.100.33, SourceFileName: "design-{i}.docx", Site_Url: "https://contoso-my.sharepoint.com/personal/alice"}
+    - {ago: 40m, _repeat: 3, _step: 30s, Operation: AnonymousLinkCreated, OfficeWorkload: SharePoint, UserId: bob@contoso.com, ClientIP: 203.0.113.33, SourceFileName: "flyer-{i}.pdf", Site_Url: "https://contoso.sharepoint.com/sites/marketing"}
+    - {ago: 40m, _repeat: 30, _step: 30s, Operation: CompanyLinkCreated, OfficeWorkload: SharePoint, UserId: carol@contoso.com, ClientIP: 203.0.113.34, SourceFileName: "policy-{i}.pdf", Site_Url: "https://contoso.sharepoint.com/sites/hr"}
+expect:
+  rows: 1
+  include:
+    - {UserId: alice@contoso.com, Links: 25}
+  exclude:
+    - {UserId: bob@contoso.com}
+    - {UserId: carol@contoso.com}

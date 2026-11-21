@@ -1,0 +1,41 @@
+id: 3bc9efac-6237-43dc-b52a-f34a3f0c32f5
+name: Mass deletion of Azure resources by one caller
+description: |
+  Twenty-five or more distinct resources deleted by one caller in an hour. Destructive attacks in the cloud often skip
+  encryption and just delete storage accounts, VMs, disks and databases after taking the data.
+  Seen in: Storm-0501 (mass deletion after exfiltration), and the 2022 Lapsus$ intrusions.
+  Tuning: environment teardown pipelines delete in bulk; exclude their service principal IDs or the dev subscription.
+  Triage: identify the caller, stop further damage (remove their role assignments, disable the account), then check
+  resource locks, soft delete and backups for recovery.
+severity: Medium
+requiredDataConnectors:
+  - connectorId: AzureActivity
+    dataTypes:
+      - AzureActivity
+queryFrequency: 1h
+queryPeriod: 1h
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - Impact
+relevantTechniques:
+  - T1485
+query: |
+  let threshold = 25;
+  AzureActivity
+  | where TimeGenerated > ago(1h)
+  | where OperationNameValue endswith "/DELETE" and ActivityStatusValue in~ ("Success", "Succeeded")
+  | summarize Deleted = dcount(_ResourceId), ResourceTypes = make_set(tolower(OperationNameValue), 20), Sample = make_set(_ResourceId, 20),
+      FirstSeen = min(TimeGenerated), LastSeen = max(TimeGenerated) by Caller, CallerIpAddress
+  | where Deleted >= threshold
+entityMappings:
+  - entityType: Account
+    fieldMappings:
+      - identifier: FullName
+        columnName: Caller
+  - entityType: IP
+    fieldMappings:
+      - identifier: Address
+        columnName: CallerIpAddress
+version: 1.0.0
+kind: Scheduled

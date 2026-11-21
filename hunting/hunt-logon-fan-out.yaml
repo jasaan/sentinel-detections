@@ -1,0 +1,27 @@
+id: e0f8c796-1a95-4024-b0d8-0c9e0db2ded0
+name: One account logging on to many devices over the network
+description: |
+  Lateral movement looks like one account (often a stolen admin or service account) making network or RDP logons to
+  many machines in a short time. This hunt lists user accounts with successful network or remote-interactive logons to
+  ten or more devices in the last day.
+  How to hunt: management servers, vulnerability scanners and backup accounts will top the list; note them once. Focus
+  on regular user accounts, accounts that don't normally do this, and source IPs that are workstations.
+requiredDataConnectors:
+  - connectorId: MicrosoftThreatProtection
+    dataTypes:
+      - DeviceLogonEvents
+tactics:
+  - LateralMovement
+relevantTechniques:
+  - T1021.001
+  - T1021.002
+  - T1078.002
+query: |
+  DeviceLogonEvents
+  | where TimeGenerated > ago(1d)
+  | where ActionType == "LogonSuccess" and LogonType in ("Network", "RemoteInteractive")
+  | where AccountName !endswith "$"
+  | summarize DeviceCount = dcount(DeviceName), Devices = make_set(DeviceName, 50), SourceIPs = make_set(RemoteIP, 10),
+      FirstSeen = min(TimeGenerated), LastSeen = max(TimeGenerated) by AccountDomain, AccountName
+  | where DeviceCount >= 10
+  | order by DeviceCount desc

@@ -1,0 +1,45 @@
+id: 8160102a-e074-429c-aeac-856563046f35
+name: Repeated failed passwords then a successful sign-in from the same IP
+description: |
+  Ten or more wrong-password or lockout failures for one user from one IP, followed by a success from that same IP, is
+  the shape of a guessing attack that worked.
+  Tuning: a user fighting a stale saved password on their own device can trigger this; the IP usually gives it away (a
+  home ISP the user has used before vs. a hosting provider).
+  Triage: check whether the IP is one the user has used before. If not, reset the password, revoke sessions, and check
+  what the session did.
+severity: High
+requiredDataConnectors:
+  - connectorId: AzureActiveDirectory
+    dataTypes:
+      - SigninLogs
+queryFrequency: 1h
+queryPeriod: 1h
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - CredentialAccess
+  - InitialAccess
+relevantTechniques:
+  - T1110.001
+  - T1078.004
+query: |
+  let FailureCodes = dynamic(["50126", "50053"]);
+  SigninLogs
+  | where TimeGenerated > ago(1h)
+  | extend UserPrincipalName = tolower(UserPrincipalName)
+  | summarize Failures = countif(ResultType in (FailureCodes)), FirstFailure = minif(TimeGenerated, ResultType in (FailureCodes)),
+      Successes = countif(ResultType == "0"), LastSuccess = maxif(TimeGenerated, ResultType == "0"),
+      Apps = make_set(AppDisplayName, 10), Location = take_any(Location)
+      by UserPrincipalName, IPAddress
+  | where Failures >= 10 and Successes > 0 and LastSuccess > FirstFailure
+entityMappings:
+  - entityType: Account
+    fieldMappings:
+      - identifier: FullName
+        columnName: UserPrincipalName
+  - entityType: IP
+    fieldMappings:
+      - identifier: Address
+        columnName: IPAddress
+version: 1.0.0
+kind: Scheduled

@@ -1,0 +1,16 @@
+rule: hunting/hunt-network-beaconing.yaml
+description: Sixty connections exactly a minute apart to a public IP show up; a short irregular burst and a regular internal flow don't.
+data:
+  DeviceNetworkEvents:
+    - {ago: 70m, _repeat: 60, _step: 60s, DeviceName: fin-ws-07, ActionType: ConnectionSuccess, RemoteIP: 198.51.100.9, RemotePort: 443, RemoteUrl: cdn-update.example, InitiatingProcessFileName: rundll32.exe}
+    - {ago: 50m, DeviceName: it-ws-01, ActionType: ConnectionSuccess, RemoteIP: 203.0.113.150, RemotePort: 443, RemoteUrl: www.contoso.com, InitiatingProcessFileName: msedge.exe}
+    - {ago: 47m, DeviceName: it-ws-01, ActionType: ConnectionSuccess, RemoteIP: 203.0.113.150, RemotePort: 443, RemoteUrl: www.contoso.com, InitiatingProcessFileName: msedge.exe}
+    - {ago: 20m, DeviceName: it-ws-01, ActionType: ConnectionSuccess, RemoteIP: 203.0.113.150, RemotePort: 443, RemoteUrl: www.contoso.com, InitiatingProcessFileName: msedge.exe}
+    - {ago: 70m, _repeat: 60, _step: 60s, DeviceName: srv-app-02, ActionType: ConnectionSuccess, RemoteIP: 10.0.0.10, RemotePort: 123, RemoteUrl: "", InitiatingProcessFileName: svchost.exe}
+expect:
+  rows: 1
+  include:
+    - {DeviceName: fin-ws-07, RemoteIP: 198.51.100.9, Connections: 60}
+  exclude:
+    - {DeviceName: it-ws-01}
+    - {DeviceName: srv-app-02}

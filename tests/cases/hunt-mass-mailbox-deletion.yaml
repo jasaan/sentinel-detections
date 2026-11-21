@@ -1,0 +1,12 @@
+rule: hunting/hunt-mass-mailbox-deletion.yaml
+description: Sixty hard deletes show up; twenty moves to Deleted Items don't.
+data:
+  OfficeActivity:
+    - {ago: 3h, _repeat: 60, _step: 5s, Operation: HardDelete, OfficeWorkload: Exchange, UserId: alice@contoso.com, MailboxOwnerUPN: alice@contoso.com, ClientIP: 198.51.100.163}
+    - {ago: 3h, _repeat: 20, _step: 5s, Operation: MoveToDeletedItems, OfficeWorkload: Exchange, UserId: bob@contoso.com, MailboxOwnerUPN: bob@contoso.com, ClientIP: 203.0.113.163}
+expect:
+  rows: 1
+  include:
+    - {Actor: alice@contoso.com, HardDeletes: 60}
+  exclude:
+    - {Actor: bob@contoso.com}

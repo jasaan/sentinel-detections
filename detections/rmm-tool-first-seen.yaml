@@ -1,0 +1,51 @@
+id: 2debacb7-e374-4fbf-840c-b954108476b8
+name: Remote access (RMM) tool runs on a device for the first time
+description: |
+  Attackers install legitimate remote-management tools (AnyDesk, ScreenConnect, Atera, Splashtop, NetSupport,
+  RustDesk and others) because they're signed, trusted by antivirus and blend in with IT. A tool that hasn't run on
+  this device in 14 days and isn't your approved one deserves a question.
+  Seen in: Scattered Spider, Black Basta (Teams vishing followed by Quick Assist/AnyDesk), and CISA advisory AA23-025A on
+  RMM abuse.
+  Tuning: put your sanctioned tool's executable names in ApprovedTools. Block the rest with WDAC or AppLocker.
+  Triage: ask the user whether IT or a "support" caller had them install it. Uninstall, check the tool's logs for
+  incoming sessions, and review what happened on the device during those sessions.
+severity: Medium
+requiredDataConnectors:
+  - connectorId: MicrosoftThreatProtection
+    dataTypes:
+      - DeviceProcessEvents
+queryFrequency: 1h
+queryPeriod: 14d
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - CommandAndControl
+  - Persistence
+relevantTechniques:
+  - T1219
+query: |
+  let ApprovedTools = dynamic(["approved-rmm-agent.exe"]);
+  let RmmPattern = @"(?i)^(anydesk|screenconnect\..*|connectwisecontrol\..*|atera.*agent|splashtop.*|srservice|teamviewer.*|tv_[wx]64|netsupport.*|client32|rustdesk|meshagent|tacticalrmm|rutserv|rfusclient|supremo.*|zohoassist.*|dwagent|simplehelp.*|remotepc.*|getscreen|ammyy.*|action1_agent|quickassist)\.exe$";
+  let Known = DeviceProcessEvents
+      | where TimeGenerated between (ago(14d) .. ago(1h))
+      | where FileName matches regex RmmPattern
+      | distinct DeviceName, Tool = tolower(FileName);
+  DeviceProcessEvents
+  | where TimeGenerated > ago(1h)
+  | where FileName matches regex RmmPattern
+  | extend Tool = tolower(FileName)
+  | where Tool !in (ApprovedTools)
+  | join kind=leftanti Known on DeviceName, Tool
+  | summarize FirstSeen = min(TimeGenerated), AccountName = take_any(AccountName), FolderPath = take_any(FolderPath),
+      Parents = make_set(InitiatingProcessFileName, 5), CommandLines = make_set(ProcessCommandLine, 5) by DeviceName, Tool
+entityMappings:
+  - entityType: Host
+    fieldMappings:
+      - identifier: HostName
+        columnName: DeviceName
+  - entityType: Account
+    fieldMappings:
+      - identifier: Name
+        columnName: AccountName
+version: 1.0.0
+kind: Scheduled

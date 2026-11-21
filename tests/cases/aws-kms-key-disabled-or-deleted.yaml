@@ -1,0 +1,12 @@
+rule: detections/aws-kms-key-disabled-or-deleted.yaml
+description: Scheduling key deletion fires; creating a key doesn't.
+data:
+  AWSCloudTrail:
+    - {ago: 20m, EventName: ScheduleKeyDeletion, EventSource: kms.amazonaws.com, UserIdentityArn: "arn:aws:iam::123456789012:user/mallory", RecipientAccountId: "123456789012", SourceIpAddress: 198.51.100.131, AWSRegion: us-east-1, RequestParameters: '{"keyId":"arn:aws:kms:us-east-1:123456789012:key/k1","pendingWindowInDays":7}'}
+    - {ago: 20m, EventName: CreateKey, EventSource: kms.amazonaws.com, UserIdentityArn: "arn:aws:iam::123456789012:user/alice", RecipientAccountId: "123456789012", SourceIpAddress: 203.0.113.131, AWSRegion: us-east-1, RequestParameters: '{"description":"app key"}'}
+expect:
+  rows: 1
+  include:
+    - {EventName: ScheduleKeyDeletion, PendingDays: "7"}
+  exclude:
+    - {EventName: CreateKey}

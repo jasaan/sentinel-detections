@@ -1,0 +1,14 @@
+rule: detections/outbound-mail-burst.yaml
+description: A user who normally mails a few people sending to 120 fires; a newsletter sender within its usual volume doesn't.
+data:
+  EmailEvents:
+    - {ago: 3d, _repeat: 5, _step: 60s, NetworkMessageId: "base-a-{i}", SenderFromAddress: alice@contoso.com, RecipientEmailAddress: "colleague{i}@contoso.com", Subject: Weekly update, EmailDirection: Intra-org, DeliveryAction: Delivered, UrlCount: 0}
+    - {ago: 40m, _repeat: 120, _step: 10s, NetworkMessageId: "now-a-{i}", SenderFromAddress: alice@contoso.com, RecipientEmailAddress: "contact{i}@customer.example", Subject: Updated payment details, EmailDirection: Outbound, DeliveryAction: Delivered, UrlCount: 1}
+    - {ago: 3d, _repeat: 110, _step: 10s, NetworkMessageId: "base-n-{i}", SenderFromAddress: news@contoso.com, RecipientEmailAddress: "sub{i}@example.org", Subject: November news, EmailDirection: Outbound, DeliveryAction: Delivered, UrlCount: 4}
+    - {ago: 40m, _repeat: 105, _step: 10s, NetworkMessageId: "now-n-{i}", SenderFromAddress: news@contoso.com, RecipientEmailAddress: "sub{i}@example.org", Subject: December news, EmailDirection: Outbound, DeliveryAction: Delivered, UrlCount: 4}
+expect:
+  rows: 1
+  include:
+    - {Sender: alice@contoso.com}
+  exclude:
+    - {Sender: news@contoso.com}

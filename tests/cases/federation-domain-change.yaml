@@ -1,0 +1,12 @@
+rule: detections/federation-domain-change.yaml
+description: Setting a domain's authentication to federated fires; adding a verified domain doesn't.
+data:
+  AuditLogs:
+    - {ago: 10m, OperationName: Set domain authentication, Result: success, Category: DirectoryManagement, InitiatedBy: {user: {userPrincipalName: admin1@contoso.com, ipAddress: 198.51.100.200}}, TargetResources: [{displayName: contoso.com}]}
+    - {ago: 10m, OperationName: Add verified domain, Result: success, Category: DirectoryManagement, InitiatedBy: {user: {userPrincipalName: admin2@contoso.com, ipAddress: 203.0.113.200}}, TargetResources: [{displayName: fabrikam.contoso.com}]}
+expect:
+  rows: 1
+  include:
+    - {Domain: contoso.com, Actor: admin1@contoso.com}
+  exclude:
+    - {Actor: admin2@contoso.com}

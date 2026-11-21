@@ -1,0 +1,29 @@
+id: 66b3f43e-7e68-4b8b-a491-53ac7c0420a0
+name: AWS resources created in a region the account doesn't normally use
+description: |
+  Attackers spin up instances, functions or clusters in regions the victim never looks at (cryptomining is the common
+  case, but also staging for exfiltration). This hunt lists accounts with create, run or put calls today in a region
+  that had no activity at all in the previous 30 days.
+  How to hunt: check the principals and event names. RunInstances or RequestSpotInstances with large instance types in
+  an unused region is almost always malicious. Disable unused regions with an SCP afterwards.
+requiredDataConnectors:
+  - connectorId: AWS
+    dataTypes:
+      - AWSCloudTrail
+tactics:
+  - Impact
+  - DefenseEvasion
+relevantTechniques:
+  - T1496
+  - T1535
+query: |
+  let Known = AWSCloudTrail
+      | where TimeGenerated between (ago(30d) .. ago(1d))
+      | distinct RecipientAccountId, AWSRegion;
+  AWSCloudTrail
+  | where TimeGenerated > ago(1d)
+  | where isempty(ErrorCode) and EventName matches regex @"^(Run|Create|Put|Start|Request|Import)"
+  | join kind=leftanti Known on RecipientAccountId, AWSRegion
+  | summarize Events = count(), EventNames = make_set(EventName, 20), Principals = make_set(UserIdentityArn, 10),
+      IPs = make_set(SourceIpAddress, 10), FirstSeen = min(TimeGenerated) by RecipientAccountId, AWSRegion
+  | order by Events desc

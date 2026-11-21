@@ -1,0 +1,12 @@
+rule: detections/named-location-change.yaml
+description: Updating a named location to a trusted range fires and flags IsTrusted; updating a CA policy doesn't.
+data:
+  AuditLogs:
+    - {ago: 10m, OperationName: Update named location, Result: success, Category: Policy, InitiatedBy: {user: {userPrincipalName: admin1@contoso.com, ipAddress: 198.51.100.32}}, TargetResources: [{displayName: HQ Egress, modifiedProperties: [{displayName: NamedLocation, newValue: '{"isTrusted":true,"ipRanges":[{"cidrAddress":"198.51.100.0/24"}]}'}]}]}
+    - {ago: 10m, OperationName: Update conditional access policy, Result: success, Category: Policy, InitiatedBy: {user: {userPrincipalName: admin2@contoso.com}}, TargetResources: [{displayName: Require MFA}]}
+expect:
+  rows: 1
+  include:
+    - {Location: HQ Egress, IsTrusted: true}
+  exclude:
+    - {Actor: admin2@contoso.com}

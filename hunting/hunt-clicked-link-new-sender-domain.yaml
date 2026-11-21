@@ -1,0 +1,36 @@
+id: bde80a48-4fed-4e20-9796-8655156a3d4c
+name: Users clicked links in mail from a sender domain never seen before
+description: |
+  Phishing often comes from freshly registered or lookalike domains that Defender hasn't classified yet. This hunt
+  lists sender domains that first mailed the organization in the last day and whose links were clicked, ranked by how
+  many people clicked.
+  How to hunt: look for lookalikes of your own domain or of suppliers, and for domains registered in the last few
+  weeks. If a domain is malicious, check the clickers' sign-ins (AiTM, MFA registration) right after the click.
+requiredDataConnectors:
+  - connectorId: MicrosoftThreatProtection
+    dataTypes:
+      - EmailEvents
+      - UrlClickEvents
+tactics:
+  - InitialAccess
+relevantTechniques:
+  - T1566.002
+  - T1583.001
+query: |
+  let KnownDomains = EmailEvents
+      | where TimeGenerated between (ago(30d) .. ago(1d))
+      | where EmailDirection =~ "Inbound"
+      | distinct SenderFromDomain;
+  let NewDomainMail = EmailEvents
+      | where TimeGenerated > ago(1d)
+      | where EmailDirection =~ "Inbound" and DeliveryAction =~ "Delivered"
+      | where SenderFromDomain !in (KnownDomains)
+      | project NetworkMessageId, RecipientEmailAddress = tolower(RecipientEmailAddress), SenderFromAddress, SenderFromDomain, Subject;
+  UrlClickEvents
+  | where TimeGenerated > ago(1d)
+  | where ActionType =~ "ClickAllowed" or IsClickedThrough == true
+  | extend AccountUpn = tolower(AccountUpn)
+  | join kind=inner NewDomainMail on NetworkMessageId, $left.AccountUpn == $right.RecipientEmailAddress
+  | summarize ClickerCount = dcount(AccountUpn), Clickers = make_set(AccountUpn, 20), Urls = make_set(Url, 10), FirstClick = min(TimeGenerated)
+      by SenderFromDomain, SenderFromAddress, Subject
+  | order by ClickerCount desc

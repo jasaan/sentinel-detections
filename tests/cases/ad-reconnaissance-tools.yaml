@@ -1,0 +1,16 @@
+rule: detections/ad-reconnaissance-tools.yaml
+description: Three kinds of discovery commands from one account and AdFind fire; a single "net user /domain" doesn't.
+data:
+  DeviceProcessEvents:
+    - {ago: 30m, DeviceName: fin-ws-07, AccountName: carol, FileName: nltest.exe, ProcessCommandLine: 'nltest.exe /domain_trusts /all_trusts', InitiatingProcessFileName: cmd.exe}
+    - {ago: 29m, DeviceName: fin-ws-07, AccountName: carol, FileName: net.exe, ProcessCommandLine: 'net.exe group "domain admins" /domain', InitiatingProcessFileName: cmd.exe}
+    - {ago: 28m, DeviceName: fin-ws-07, AccountName: carol, FileName: net.exe, ProcessCommandLine: 'net.exe user /domain', InitiatingProcessFileName: cmd.exe}
+    - {ago: 20m, DeviceName: srv-app-02, AccountName: svc-sql, FileName: af.exe, ProcessVersionInfoOriginalFileName: AdFind.exe, ProcessCommandLine: 'af.exe -f "(objectcategory=computer)" -csv name', InitiatingProcessFileName: cmd.exe}
+    - {ago: 20m, DeviceName: it-ws-01, AccountName: helpdesk1, FileName: net.exe, ProcessCommandLine: 'net.exe user bob /domain', InitiatingProcessFileName: cmd.exe}
+expect:
+  rows: 2
+  include:
+    - {DeviceName: fin-ws-07, AccountName: carol}
+    - {DeviceName: srv-app-02}
+  exclude:
+    - {DeviceName: it-ws-01}

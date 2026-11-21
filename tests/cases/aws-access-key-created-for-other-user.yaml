@@ -1,0 +1,12 @@
+rule: detections/aws-access-key-created-for-other-user.yaml
+description: Creating a key for another user fires; creating your own key doesn't.
+data:
+  AWSCloudTrail:
+    - {ago: 20m, EventName: CreateAccessKey, EventSource: iam.amazonaws.com, UserIdentityType: IAMUser, UserIdentityArn: "arn:aws:iam::123456789012:user/mallory", UserIdentityUserName: mallory, RecipientAccountId: "123456789012", SourceIpAddress: 198.51.100.123, RequestParameters: '{"userName":"backup-svc"}'}
+    - {ago: 20m, EventName: CreateAccessKey, EventSource: iam.amazonaws.com, UserIdentityType: IAMUser, UserIdentityArn: "arn:aws:iam::123456789012:user/alice", UserIdentityUserName: alice, RecipientAccountId: "123456789012", SourceIpAddress: 203.0.113.123, RequestParameters: '{}'}
+expect:
+  rows: 1
+  include:
+    - {CallerName: mallory, TargetUser: backup-svc}
+  exclude:
+    - {CallerName: alice}

@@ -1,0 +1,12 @@
+rule: detections/azure-elevate-access.yaml
+description: The elevate-access audit event fires; an unrelated role event doesn't.
+data:
+  AuditLogs:
+    - {ago: 10m, OperationName: User has elevated their access to User Access Administrator for their Azure Resources, Result: success, Category: AzureRBACRoleManagementElevateAccess, InitiatedBy: {user: {userPrincipalName: ga1@contoso.com, ipAddress: 198.51.100.104}}}
+    - {ago: 10m, OperationName: Add member to role, Result: success, Category: RoleManagement, InitiatedBy: {user: {userPrincipalName: ga2@contoso.com}}}
+expect:
+  rows: 1
+  include:
+    - {Actor: ga1@contoso.com}
+  exclude:
+    - {Actor: ga2@contoso.com}

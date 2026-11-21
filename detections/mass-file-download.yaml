@@ -5,6 +5,8 @@ description: |
   employee.
   Tuning: set the threshold above normal sync behavior for your users; exclude backup and migration service accounts.
   Pair with your offboarding list for insider-risk cases.
+  Triage: Check the device and IP used, ask the user (and their manager) about the downloads, and revoke sessions if the
+  activity isn't theirs.
 severity: Medium
 requiredDataConnectors:
   - connectorId: Office365

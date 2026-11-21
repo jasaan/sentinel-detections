@@ -1,0 +1,12 @@
+rule: detections/cryptominer-execution.yaml
+description: A renamed miner with stratum arguments fires; a Python app with a hashing flag doesn't.
+data:
+  DeviceProcessEvents:
+    - {ago: 10m, DeviceName: lnx-k8s-03, AccountName: root, FileName: kworkerds, FolderPath: /tmp/.x/kworkerds, ProcessCommandLine: "/tmp/.x/kworkerds -o stratum+tcp://pool.example.net:3333 -u 4Abc --donate-level 1", InitiatingProcessFileName: sh}
+    - {ago: 10m, DeviceName: lnx-app-01, AccountName: app, FileName: python3, FolderPath: /usr/bin/python3, ProcessCommandLine: "python3 app.py --algo sha256", InitiatingProcessFileName: systemd}
+expect:
+  rows: 1
+  include:
+    - {DeviceName: lnx-k8s-03}
+  exclude:
+    - {DeviceName: lnx-app-01}

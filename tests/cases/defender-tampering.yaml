@@ -1,0 +1,16 @@
+rule: detections/defender-tampering.yaml
+description: Disabling real-time monitoring and adding a path exclusion fire; reading preferences and changing the update interval don't.
+data:
+  DeviceProcessEvents:
+    - {ago: 10m, DeviceName: fin-ws-07, AccountName: mallory, FileName: powershell.exe, ProcessCommandLine: 'powershell.exe -c Set-MpPreference -DisableRealtimeMonitoring $true', InitiatingProcessFileName: cmd.exe}
+    - {ago: 10m, DeviceName: fin-ws-08, AccountName: mallory, FileName: powershell.exe, ProcessCommandLine: 'powershell.exe Add-MpPreference -ExclusionPath C:\Users\Public', InitiatingProcessFileName: cmd.exe}
+    - {ago: 10m, DeviceName: it-ws-01, AccountName: alice, FileName: powershell.exe, ProcessCommandLine: 'powershell.exe Get-MpPreference', InitiatingProcessFileName: explorer.exe}
+    - {ago: 10m, DeviceName: it-ws-02, AccountName: bob, FileName: powershell.exe, ProcessCommandLine: 'powershell.exe Set-MpPreference -SignatureUpdateInterval 1', InitiatingProcessFileName: explorer.exe}
+expect:
+  rows: 2
+  include:
+    - {DeviceName: fin-ws-07}
+    - {DeviceName: fin-ws-08}
+  exclude:
+    - {DeviceName: it-ws-01}
+    - {DeviceName: it-ws-02}

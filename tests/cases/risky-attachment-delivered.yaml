@@ -1,0 +1,18 @@
+rule: detections/risky-attachment-delivered.yaml
+description: An ISO attachment delivered to the inbox fires; a PDF and a quarantined LNK don't.
+data:
+  EmailAttachmentInfo:
+    - {ago: 20m, NetworkMessageId: msg-10, SenderFromAddress: billing@invoices.example, RecipientEmailAddress: alice@contoso.com, FileName: Invoice_8812.iso, FileType: iso, SHA256: aaaa000000000000000000000000000000000000000000000000000000000001}
+    - {ago: 20m, NetworkMessageId: msg-11, SenderFromAddress: partner@vendor.example, RecipientEmailAddress: bob@contoso.com, FileName: statement.pdf, FileType: pdf, SHA256: aaaa000000000000000000000000000000000000000000000000000000000002}
+    - {ago: 20m, NetworkMessageId: msg-12, SenderFromAddress: hr@payroll.example, RecipientEmailAddress: carol@contoso.com, FileName: Payslip.lnk, FileType: lnk, SHA256: aaaa000000000000000000000000000000000000000000000000000000000003}
+  EmailEvents:
+    - {ago: 20m, NetworkMessageId: msg-10, RecipientEmailAddress: alice@contoso.com, SenderFromAddress: billing@invoices.example, SenderFromDomain: invoices.example, Subject: Invoice 8812, EmailDirection: Inbound, DeliveryAction: Delivered, DeliveryLocation: Inbox/folder, ThreatTypes: "", UrlCount: 0, AttachmentCount: 1}
+    - {ago: 20m, NetworkMessageId: msg-11, RecipientEmailAddress: bob@contoso.com, SenderFromAddress: partner@vendor.example, SenderFromDomain: vendor.example, Subject: Statement, EmailDirection: Inbound, DeliveryAction: Delivered, DeliveryLocation: Inbox/folder, ThreatTypes: "", UrlCount: 0, AttachmentCount: 1}
+    - {ago: 20m, NetworkMessageId: msg-12, RecipientEmailAddress: carol@contoso.com, SenderFromAddress: hr@payroll.example, SenderFromDomain: payroll.example, Subject: Payslip, EmailDirection: Inbound, DeliveryAction: Blocked, DeliveryLocation: Quarantine, ThreatTypes: Malware, UrlCount: 0, AttachmentCount: 1}
+expect:
+  rows: 1
+  include:
+    - {FileName: Invoice_8812.iso, Extension: iso}
+  exclude:
+    - {FileName: statement.pdf}
+    - {FileName: Payslip.lnk}

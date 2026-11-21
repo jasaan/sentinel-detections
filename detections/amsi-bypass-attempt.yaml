@@ -1,0 +1,39 @@
+id: 675c7c14-4a2d-4b8a-923a-dc5d88f490a7
+name: AMSI bypass strings in a command line
+description: |
+  The Antimalware Scan Interface lets Defender inspect PowerShell and script content at run time. Attackers disable it
+  in their own process by flipping amsiInitFailed or patching AmsiScanBuffer before loading their real payload. The
+  classic bypass strings show up in the command line when it isn't obfuscated further.
+  Seen in: PowerShell Empire, Cobalt Strike PowerShell stagers and many public loaders.
+  Tuning: security training labs and red-team exercises; nothing in normal operations.
+  Triage: look at what ran next in the same PowerShell process (network connections, child processes) and isolate the
+  device if a payload followed.
+severity: Medium
+requiredDataConnectors:
+  - connectorId: MicrosoftThreatProtection
+    dataTypes:
+      - DeviceProcessEvents
+queryFrequency: 1h
+queryPeriod: 1h
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - DefenseEvasion
+relevantTechniques:
+  - T1562.001
+query: |
+  DeviceProcessEvents
+  | where TimeGenerated > ago(1h)
+  | where ProcessCommandLine matches regex @"(?i)amsiutils|amsiinitfailed|amsiscanbuffer|amsicontext|amsiopensession"
+  | project TimeGenerated, DeviceName, AccountName, FileName, ProcessCommandLine, InitiatingProcessFileName, InitiatingProcessCommandLine
+entityMappings:
+  - entityType: Host
+    fieldMappings:
+      - identifier: HostName
+        columnName: DeviceName
+  - entityType: Account
+    fieldMappings:
+      - identifier: Name
+        columnName: AccountName
+version: 1.0.0
+kind: Scheduled

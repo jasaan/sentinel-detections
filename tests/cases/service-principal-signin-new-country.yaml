@@ -1,0 +1,16 @@
+rule: detections/service-principal-signin-new-country.yaml
+description: An app that always signs in from the US signing in from Russia fires; a known-country sign-in and a brand-new app don't.
+data:
+  AADServicePrincipalSignInLogs:
+    - {ago: 6d, ServicePrincipalName: BackupSync, ServicePrincipalId: sp-1, AppId: app-1, ResultType: "0", Location: US, IPAddress: 203.0.113.80}
+    - {ago: 20m, ServicePrincipalName: BackupSync, ServicePrincipalId: sp-1, AppId: app-1, ResultType: "0", Location: RU, IPAddress: 198.51.100.80, ResourceDisplayName: Microsoft Graph}
+    - {ago: 6d, ServicePrincipalName: HRConnector, ServicePrincipalId: sp-2, AppId: app-2, ResultType: "0", Location: US, IPAddress: 203.0.113.81}
+    - {ago: 20m, ServicePrincipalName: HRConnector, ServicePrincipalId: sp-2, AppId: app-2, ResultType: "0", Location: US, IPAddress: 203.0.113.81}
+    - {ago: 20m, ServicePrincipalName: NewPilotApp, ServicePrincipalId: sp-3, AppId: app-3, ResultType: "0", Location: DE, IPAddress: 198.51.100.81}
+expect:
+  rows: 1
+  include:
+    - {ServicePrincipalName: BackupSync, Location: RU}
+  exclude:
+    - {ServicePrincipalName: HRConnector}
+    - {ServicePrincipalName: NewPilotApp}

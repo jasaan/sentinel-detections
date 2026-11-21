@@ -1,0 +1,39 @@
+id: 31246126-484d-4fdf-8fef-64b9e1f96c15
+name: Burst of anonymous "anyone with the link" sharing links
+description: |
+  Anonymous links work for anyone who has the URL, with no sign-in. Creating many of them in an hour is a quiet way to
+  stage files for exfiltration that doesn't show up as downloads by the account.
+  Tuning: set the threshold above what your heaviest sharers do in an hour. If anonymous links aren't needed, turn them
+  off at the tenant level; this rule then catches attempts to re-enable or work around that.
+  Triage: list the files and sites, check whether the links have been used (AnonymousLinkUsed events), and remove links
+  the user can't explain.
+severity: Medium
+requiredDataConnectors:
+  - connectorId: Office365
+    dataTypes:
+      - OfficeActivity
+queryFrequency: 1h
+queryPeriod: 1h
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - Exfiltration
+  - Collection
+relevantTechniques:
+  - T1567
+  - T1213.002
+query: |
+  let threshold = 20;
+  OfficeActivity
+  | where TimeGenerated > ago(1h)
+  | where OfficeWorkload in ("SharePoint", "OneDrive") and Operation == "AnonymousLinkCreated"
+  | summarize Links = count(), Files = dcount(SourceFileName), SampleFiles = make_set(SourceFileName, 20), Sites = make_set(Site_Url, 10),
+      ClientIPs = make_set(ClientIP, 10), FirstSeen = min(TimeGenerated), LastSeen = max(TimeGenerated) by UserId
+  | where Links >= threshold
+entityMappings:
+  - entityType: Account
+    fieldMappings:
+      - identifier: FullName
+        columnName: UserId
+version: 1.0.0
+kind: Scheduled

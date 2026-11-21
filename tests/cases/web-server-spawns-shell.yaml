@@ -1,0 +1,14 @@
+rule: detections/web-server-spawns-shell.yaml
+description: IIS starting cmd /c whoami and nginx starting sh fire; IIS starting the C# compiler doesn't.
+data:
+  DeviceProcessEvents:
+    - {ago: 10m, DeviceName: srv-web-01, AccountName: DefaultAppPool, FileName: cmd.exe, ProcessCommandLine: 'cmd.exe /c whoami /all', InitiatingProcessFileName: w3wp.exe}
+    - {ago: 10m, DeviceName: lnx-web-02, AccountName: www-data, FileName: sh, ProcessCommandLine: 'sh -c id;uname -a', InitiatingProcessFileName: nginx}
+    - {ago: 10m, DeviceName: srv-web-03, AccountName: DefaultAppPool, FileName: csc.exe, ProcessCommandLine: 'csc.exe /noconfig /fullpaths @"C:\Windows\Temp\x.cmdline"', InitiatingProcessFileName: w3wp.exe}
+expect:
+  rows: 2
+  include:
+    - {DeviceName: srv-web-01}
+    - {DeviceName: lnx-web-02}
+  exclude:
+    - {DeviceName: srv-web-03}

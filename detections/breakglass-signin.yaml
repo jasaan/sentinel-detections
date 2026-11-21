@@ -5,6 +5,8 @@ description: |
   so any sign-in attempt, successful or not, needs an immediate human look.
   Tuning: replace the BreakGlassAccounts list with your accounts, or with a Sentinel watchlist
   (_GetWatchlist('BreakGlassAccounts') | project SearchKey). Expected volume is near zero; every alert is worth a call.
+  Triage: Call the account's custodians straight away. If no one used it, reset the password, check the sign-in's IP and
+  device, and review every action taken in the session.
 severity: High
 requiredDataConnectors:
   - connectorId: AzureActiveDirectory

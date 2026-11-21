@@ -1,0 +1,46 @@
+id: d34d6a49-4a4f-42c6-963d-18df124f0702
+name: Mass file renaming to a new extension (possible ransomware encryption)
+description: |
+  Most ransomware renames each file it encrypts with its own extension. One process renaming 100+ files to the same
+  unusual extension within 15 minutes is the encryption itself, and every minute counts.
+  Tuning: common document, image, archive and temp extensions are excluded so Office saves, sync clients and backup
+  tools don't fire. Add extensions your own tools produce.
+  Triage: isolate the device immediately (and any server whose shares it's writing to), identify the process and how
+  it started, and check whether other devices show the same extension.
+severity: High
+requiredDataConnectors:
+  - connectorId: MicrosoftThreatProtection
+    dataTypes:
+      - DeviceFileEvents
+queryFrequency: 15m
+queryPeriod: 15m
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - Impact
+relevantTechniques:
+  - T1486
+query: |
+  let threshold = 100;
+  let CommonExtensions = dynamic(["doc", "docx", "xls", "xlsx", "ppt", "pptx", "pdf", "txt", "csv", "jpg", "jpeg", "png", "gif",
+      "zip", "7z", "rar", "tmp", "temp", "log", "bak", "old", "partial", "crdownload", "part", "json", "xml", "dat", "db", "msg", "eml"]);
+  DeviceFileEvents
+  | where TimeGenerated > ago(15m)
+  | where ActionType == "FileRenamed"
+  | extend NewExt = tolower(extract(@"\.([^.\\/]+)$", 1, FileName)), OldExt = tolower(extract(@"\.([^.\\/]+)$", 1, PreviousFileName))
+  | where isnotempty(NewExt) and NewExt != OldExt and NewExt !in (CommonExtensions)
+  | summarize Renamed = count(), SampleFiles = make_set(FolderPath, 10), FirstSeen = min(TimeGenerated), LastSeen = max(TimeGenerated),
+      AccountName = take_any(InitiatingProcessAccountName)
+      by DeviceName, InitiatingProcessFileName, InitiatingProcessCommandLine, NewExt
+  | where Renamed >= threshold
+entityMappings:
+  - entityType: Host
+    fieldMappings:
+      - identifier: HostName
+        columnName: DeviceName
+  - entityType: Account
+    fieldMappings:
+      - identifier: Name
+        columnName: AccountName
+version: 1.0.0
+kind: Scheduled

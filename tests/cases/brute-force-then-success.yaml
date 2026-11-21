@@ -1,0 +1,16 @@
+rule: detections/brute-force-then-success.yaml
+description: Twelve failures then a success from one IP fires; failures without a success and a few failures then success don't.
+data:
+  SigninLogs:
+    - {ago: 40m, _repeat: 12, _step: 30s, UserPrincipalName: alice@contoso.com, ResultType: "50126", IPAddress: 198.51.100.44, Location: BR}
+    - {ago: 20m, UserPrincipalName: alice@contoso.com, ResultType: "0", IPAddress: 198.51.100.44, Location: BR}
+    - {ago: 40m, _repeat: 12, _step: 30s, UserPrincipalName: bob@contoso.com, ResultType: "50126", IPAddress: 198.51.100.45, Location: BR}
+    - {ago: 40m, _repeat: 3, _step: 30s, UserPrincipalName: carol@contoso.com, ResultType: "50126", IPAddress: 203.0.113.46, Location: US}
+    - {ago: 20m, UserPrincipalName: carol@contoso.com, ResultType: "0", IPAddress: 203.0.113.46, Location: US}
+expect:
+  rows: 1
+  include:
+    - {UserPrincipalName: alice@contoso.com, Failures: 12}
+  exclude:
+    - {UserPrincipalName: bob@contoso.com}
+    - {UserPrincipalName: carol@contoso.com}

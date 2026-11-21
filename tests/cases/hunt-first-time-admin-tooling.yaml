@@ -1,0 +1,13 @@
+rule: hunting/hunt-first-time-admin-tooling.yaml
+description: A first Graph CLI sign-in shows up; a regular Azure CLI user doesn't.
+data:
+  SigninLogs:
+    - {ago: 2h, UserPrincipalName: alice@contoso.com, ResultType: "0", AppDisplayName: Microsoft Graph Command Line Tools, IPAddress: 198.51.100.160, Location: US}
+    - {ago: 10d, UserPrincipalName: bob@contoso.com, ResultType: "0", AppDisplayName: Microsoft Azure CLI, IPAddress: 203.0.113.160, Location: US}
+    - {ago: 2h, UserPrincipalName: bob@contoso.com, ResultType: "0", AppDisplayName: Microsoft Azure CLI, IPAddress: 203.0.113.160, Location: US}
+expect:
+  rows: 1
+  include:
+    - {UserPrincipalName: alice@contoso.com}
+  exclude:
+    - {UserPrincipalName: bob@contoso.com}

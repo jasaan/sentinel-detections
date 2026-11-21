@@ -1,0 +1,12 @@
+rule: detections/amsi-bypass-attempt.yaml
+description: The amsiInitFailed reflection bypass fires; an ordinary PowerShell command doesn't.
+data:
+  DeviceProcessEvents:
+    - {ago: 10m, DeviceName: fin-ws-07, AccountName: mallory, FileName: powershell.exe, ProcessCommandLine: "powershell.exe -c \"[Ref].Assembly.GetType('System.Management.Automation.AmsiUtils').GetField('amsiInitFailed','NonPublic,Static').SetValue($null,$true)\"", InitiatingProcessFileName: cmd.exe}
+    - {ago: 10m, DeviceName: it-ws-01, AccountName: alice, FileName: powershell.exe, ProcessCommandLine: 'powershell.exe Get-Process | Sort-Object CPU', InitiatingProcessFileName: explorer.exe}
+expect:
+  rows: 1
+  include:
+    - {DeviceName: fin-ws-07}
+  exclude:
+    - {DeviceName: it-ws-01}

@@ -1,0 +1,44 @@
+id: 50b9f4d7-968b-4761-8924-50148f272c49
+name: Kerberoasting (many RC4 service tickets requested by one account)
+description: |
+  Any domain user can request a service ticket for an account with an SPN, and the ticket is encrypted with that
+  account's password hash. Requesting RC4-encrypted tickets (type 0x17) for many SPNs at once and cracking them offline
+  is Kerberoasting. Service accounts with weak passwords fall in minutes.
+  Seen in: almost every Active Directory intrusion (Rubeus, Impacket GetUserSPNs).
+  Tuning: requires auditing of Kerberos Service Ticket Operations on domain controllers. Old applications that still
+  use RC4 request tickets for one or two SPNs; the five-SPN threshold skips them.
+  Triage: check the requesting account and source IP. Rotate the passwords of the requested service accounts (long
+  random passwords or gMSAs) and disable RC4 where possible.
+severity: High
+requiredDataConnectors:
+  - connectorId: SecurityEvents
+    dataTypes:
+      - SecurityEvent
+queryFrequency: 1h
+queryPeriod: 1h
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - CredentialAccess
+relevantTechniques:
+  - T1558.003
+query: |
+  let threshold = 5;
+  SecurityEvent
+  | where TimeGenerated > ago(1h)
+  | where EventID == 4769 and TicketEncryptionType == "0x17"
+  | where ServiceName !endswith "$" and ServiceName !~ "krbtgt"
+  | summarize Services = dcount(ServiceName), ServiceList = make_set(ServiceName, 50), FirstSeen = min(TimeGenerated),
+      LastSeen = max(TimeGenerated), DomainControllers = make_set(Computer, 5) by TargetUserName, IpAddress
+  | where Services >= threshold
+entityMappings:
+  - entityType: Account
+    fieldMappings:
+      - identifier: Name
+        columnName: TargetUserName
+  - entityType: IP
+    fieldMappings:
+      - identifier: Address
+        columnName: IpAddress
+version: 1.0.0
+kind: Scheduled

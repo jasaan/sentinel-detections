@@ -1,0 +1,14 @@
+rule: detections/aws-console-login-without-mfa.yaml
+description: A password-only IAM console login fires; an MFA login and a failed login don't.
+data:
+  AWSCloudTrail:
+    - {ago: 20m, EventName: ConsoleLogin, EventSource: signin.amazonaws.com, UserIdentityType: IAMUser, UserIdentityArn: "arn:aws:iam::123456789012:user/dev1", UserIdentityUserName: dev1, RecipientAccountId: "123456789012", SourceIpAddress: 198.51.100.124, ResponseElements: '{"ConsoleLogin":"Success"}', AdditionalEventData: '{"LoginTo":"https://console.aws.amazon.com","MobileVersion":"No","MFAUsed":"No"}'}
+    - {ago: 20m, EventName: ConsoleLogin, EventSource: signin.amazonaws.com, UserIdentityType: IAMUser, UserIdentityArn: "arn:aws:iam::123456789012:user/dev2", UserIdentityUserName: dev2, RecipientAccountId: "123456789012", SourceIpAddress: 203.0.113.124, ResponseElements: '{"ConsoleLogin":"Success"}', AdditionalEventData: '{"MFAUsed":"Yes"}'}
+    - {ago: 20m, EventName: ConsoleLogin, EventSource: signin.amazonaws.com, UserIdentityType: IAMUser, UserIdentityArn: "arn:aws:iam::123456789012:user/dev3", UserIdentityUserName: dev3, RecipientAccountId: "123456789012", SourceIpAddress: 198.51.100.125, ResponseElements: '{"ConsoleLogin":"Failure"}', AdditionalEventData: '{"MFAUsed":"No"}', ErrorCode: Failed authentication}
+expect:
+  rows: 1
+  include:
+    - {User: dev1}
+  exclude:
+    - {User: dev2}
+    - {User: dev3}

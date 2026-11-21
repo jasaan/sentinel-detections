@@ -1,0 +1,14 @@
+rule: detections/ntds-dit-extraction.yaml
+description: ntdsutil IFM and copying ntds.dit from a shadow copy fire; ntdsutil metadata cleanup doesn't.
+data:
+  DeviceProcessEvents:
+    - {ago: 10m, DeviceName: dc01, AccountName: mallory, FileName: ntdsutil.exe, ProcessCommandLine: 'ntdsutil.exe "ac i ntds" "ifm" "create full C:\Windows\Temp\x" q q', InitiatingProcessFileName: cmd.exe}
+    - {ago: 10m, DeviceName: dc02, AccountName: mallory, FileName: cmd.exe, ProcessCommandLine: 'cmd.exe /c copy \\?\GLOBALROOT\Device\HarddiskVolumeShadowCopy3\Windows\NTDS\ntds.dit C:\Windows\Temp\n.dit', InitiatingProcessFileName: wmiprvse.exe}
+    - {ago: 10m, DeviceName: dc03, AccountName: adadmin, FileName: ntdsutil.exe, ProcessCommandLine: 'ntdsutil.exe "metadata cleanup" "remove selected server dc-old"', InitiatingProcessFileName: cmd.exe}
+expect:
+  rows: 2
+  include:
+    - {DeviceName: dc01}
+    - {DeviceName: dc02}
+  exclude:
+    - {DeviceName: dc03}

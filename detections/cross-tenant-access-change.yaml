@@ -1,0 +1,41 @@
+id: c9bb8315-26f2-4d1f-8e91-ad13ef8e0f9d
+name: Cross-tenant access or sync settings changed
+description: |
+  Cross-tenant access settings decide which outside tenants can sign in to yours, and whether their MFA and device
+  claims are trusted. Cross-tenant sync can push users from another tenant into yours. An attacker who adds their own
+  tenant as a trusted partner gets a quiet way back in.
+  Seen in: Microsoft's guidance on cross-tenant synchronization abuse for lateral movement and persistence.
+  Tuning: changes should be rare and tied to a known B2B partner project.
+  Triage: check which partner tenant ID was added or changed and whether inbound trust or sync was turned on. Revert
+  anything you can't tie to a known partner.
+severity: Medium
+requiredDataConnectors:
+  - connectorId: AzureActiveDirectory
+    dataTypes:
+      - AuditLogs
+queryFrequency: 1h
+queryPeriod: 1h
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - Persistence
+  - DefenseEvasion
+relevantTechniques:
+  - T1484.002
+query: |
+  AuditLogs
+  | where TimeGenerated > ago(1h)
+  | where OperationName contains "cross-tenant" and Result =~ "success"
+  | where OperationName !startswith "Get " and OperationName !startswith "List "
+  | extend Target = tostring(TargetResources[0].displayName), TargetId = tostring(TargetResources[0].id),
+      Actor = coalesce(tostring(InitiatedBy.user.userPrincipalName), tostring(InitiatedBy.app.displayName)),
+      ActorIP = tostring(InitiatedBy.user.ipAddress),
+      NewValue = tostring(TargetResources[0].modifiedProperties[0].newValue)
+  | project TimeGenerated, OperationName, Target, TargetId, Actor, ActorIP, NewValue
+entityMappings:
+  - entityType: Account
+    fieldMappings:
+      - identifier: FullName
+        columnName: Actor
+version: 1.0.0
+kind: Scheduled

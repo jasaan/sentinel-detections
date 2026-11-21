@@ -1,0 +1,46 @@
+id: 1bac263a-ee67-4f90-b36d-4d90280869d8
+name: Device code sign-in by a user who doesn't normally use it
+description: |
+  Device code phishing sends the victim a real Microsoft login code ("enter this code at microsoft.com/devicelogin to
+  join the meeting"). When they enter it, the attacker's device receives their tokens, MFA included. Most users never
+  use the device code flow, so a successful one from a user with no device-code history in 14 days deserves a look.
+  Seen in: Storm-2372 (2025) and other device code phishing campaigns aimed at Microsoft 365.
+  Tuning: conference-room devices, Azure CLI users and some IoT sign-ins use device code legitimately. The best fix is a
+  Conditional Access policy that blocks the device code flow for everyone who doesn't need it.
+  Triage: ask the user whether they entered a code. If not, revoke sessions, review sign-ins from the returned IPs and
+  check mailbox access (MailItemsAccessed) for the period after the sign-in.
+severity: Medium
+requiredDataConnectors:
+  - connectorId: AzureActiveDirectory
+    dataTypes:
+      - SigninLogs
+queryFrequency: 1h
+queryPeriod: 14d
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - InitialAccess
+  - CredentialAccess
+relevantTechniques:
+  - T1566.002
+  - T1528
+query: |
+  let History = SigninLogs
+      | where TimeGenerated between (ago(14d) .. ago(1h))
+      | where AuthenticationProtocol =~ "deviceCode"
+      | distinct UserPrincipalName = tolower(UserPrincipalName);
+  SigninLogs
+  | where TimeGenerated > ago(1h)
+  | where AuthenticationProtocol =~ "deviceCode" and ResultType == "0"
+  | extend UserPrincipalName = tolower(UserPrincipalName)
+  | where UserPrincipalName !in (History)
+  | summarize FirstSignIn = min(TimeGenerated), IPs = make_set(IPAddress, 10), Locations = make_set(Location, 10),
+      Apps = make_set(AppDisplayName, 10), Resources = make_set(ResourceDisplayName, 10)
+      by UserPrincipalName
+entityMappings:
+  - entityType: Account
+    fieldMappings:
+      - identifier: FullName
+        columnName: UserPrincipalName
+version: 1.0.0
+kind: Scheduled

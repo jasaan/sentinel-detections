@@ -1,0 +1,14 @@
+rule: detections/aws-admin-policy-granted.yaml
+description: Attaching AdministratorAccess and an inline *:* role policy fire; an inline s3:GetObject policy doesn't.
+data:
+  AWSCloudTrail:
+    - {ago: 20m, EventName: AttachUserPolicy, EventSource: iam.amazonaws.com, UserIdentityType: IAMUser, UserIdentityArn: "arn:aws:iam::123456789012:user/mallory", RecipientAccountId: "123456789012", SourceIpAddress: 198.51.100.126, RequestParameters: '{"userName":"mallory","policyArn":"arn:aws:iam::aws:policy/AdministratorAccess"}'}
+    - {ago: 20m, EventName: PutRolePolicy, EventSource: iam.amazonaws.com, UserIdentityType: IAMUser, UserIdentityArn: "arn:aws:iam::123456789012:user/mallory", RecipientAccountId: "123456789012", SourceIpAddress: 198.51.100.126, RequestParameters: '{"roleName":"lambda-exec","policyName":"debug","policyDocument":"{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":\"*\",\"Resource\":\"*\"}]}"}'}
+    - {ago: 20m, EventName: PutUserPolicy, EventSource: iam.amazonaws.com, UserIdentityType: IAMUser, UserIdentityArn: "arn:aws:iam::123456789012:user/alice", RecipientAccountId: "123456789012", SourceIpAddress: 203.0.113.126, RequestParameters: '{"userName":"reports","policyName":"read-reports","policyDocument":"{\"Version\":\"2012-10-17\",\"Statement\":{\"Effect\":\"Allow\",\"Action\":[\"s3:GetObject\"],\"Resource\":\"arn:aws:s3:::reports/*\"}}"}'}
+expect:
+  rows: 2
+  include:
+    - {EventName: AttachUserPolicy, Target: mallory}
+    - {EventName: PutRolePolicy, Target: lambda-exec}
+  exclude:
+    - {Target: reports}

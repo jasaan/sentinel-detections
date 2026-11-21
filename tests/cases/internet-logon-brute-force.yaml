@@ -1,0 +1,13 @@
+rule: detections/internet-logon-brute-force.yaml
+description: Twenty-five failures and a success from a public IP fire and flag Compromised; thirty failures from an internal IP don't.
+data:
+  DeviceLogonEvents:
+    - {ago: 40m, _repeat: 25, _step: 30s, DeviceName: srv-rdp-01, ActionType: LogonFailed, LogonType: RemoteInteractive, AccountName: "admin{i}", AccountDomain: srv-rdp-01, RemoteIP: 198.51.100.140, RemoteIPType: Public}
+    - {ago: 20m, DeviceName: srv-rdp-01, ActionType: LogonSuccess, LogonType: RemoteInteractive, AccountName: backup, AccountDomain: srv-rdp-01, RemoteIP: 198.51.100.140, RemoteIPType: Public}
+    - {ago: 40m, _repeat: 30, _step: 30s, DeviceName: srv-app-02, ActionType: LogonFailed, LogonType: Network, AccountName: svc-old, AccountDomain: CONTOSO, RemoteIP: 10.0.4.20, RemoteIPType: Private}
+expect:
+  rows: 1
+  include:
+    - {DeviceName: srv-rdp-01, Failures: 25, Compromised: true}
+  exclude:
+    - {DeviceName: srv-app-02}

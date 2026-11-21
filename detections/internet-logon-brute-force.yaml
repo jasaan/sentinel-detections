@@ -1,0 +1,46 @@
+id: 754bb848-4749-4923-b7f2-e3c496fb8af0
+name: Brute force against a device from a public IP (RDP, SMB or SSH)
+description: |
+  Twenty or more failed logons to one device from one public IP in an hour means a management port is exposed to the
+  internet and being attacked. The Compromised column flags the cases where that same IP also logged on successfully.
+  Seen in: initial access for Dharma, Phobos and many other ransomware families through exposed RDP; SSH brute force
+  against Linux servers.
+  Tuning: none for the rule itself; fix the exposure (VPN, Bastion, just-in-time access) and the alerts stop.
+  Triage: if Compromised is true, isolate the device and investigate the session. Either way, close the port and check
+  the NSG rule (see the NSG management-port rule).
+severity: Medium
+requiredDataConnectors:
+  - connectorId: MicrosoftThreatProtection
+    dataTypes:
+      - DeviceLogonEvents
+queryFrequency: 1h
+queryPeriod: 1h
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - CredentialAccess
+  - InitialAccess
+relevantTechniques:
+  - T1110.001
+  - T1133
+query: |
+  DeviceLogonEvents
+  | where TimeGenerated > ago(1h)
+  | where RemoteIPType == "Public"
+  | summarize Failures = countif(ActionType == "LogonFailed"), Successes = countif(ActionType == "LogonSuccess"),
+      Accounts = make_set(AccountName, 20), SuccessAccounts = make_set_if(AccountName, ActionType == "LogonSuccess", 5),
+      LogonTypes = make_set(LogonType), FirstSeen = min(TimeGenerated), LastSeen = max(TimeGenerated)
+      by DeviceName, RemoteIP
+  | where Failures >= 20
+  | extend Compromised = Successes > 0
+entityMappings:
+  - entityType: Host
+    fieldMappings:
+      - identifier: HostName
+        columnName: DeviceName
+  - entityType: IP
+    fieldMappings:
+      - identifier: Address
+        columnName: RemoteIP
+version: 1.0.0
+kind: Scheduled

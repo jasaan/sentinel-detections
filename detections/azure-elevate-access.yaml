@@ -1,0 +1,38 @@
+id: 040f00a9-c037-4369-b28e-4649495dd0fb
+name: Global Administrator elevated access to all Azure subscriptions
+description: |
+  The "Access management for Azure resources" toggle gives a Global Administrator User Access Administrator at the root
+  scope, and with it control over every subscription and management group. It's a well-known jump from Entra ID to
+  Azure and should be used only briefly in emergencies.
+  Seen in: Storm-0501 (2024) and other Entra-to-Azure pivots after a Global Admin compromise.
+  Tuning: none expected; every use should match an emergency change.
+  Triage: confirm with the admin. Make sure the elevation was removed afterwards (the root-scope assignment should be
+  gone) and review Azure activity by that account since the elevation.
+severity: High
+requiredDataConnectors:
+  - connectorId: AzureActiveDirectory
+    dataTypes:
+      - AuditLogs
+queryFrequency: 1h
+queryPeriod: 1h
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - PrivilegeEscalation
+relevantTechniques:
+  - T1098.003
+  - T1078.004
+query: |
+  AuditLogs
+  | where TimeGenerated > ago(1h)
+  | where OperationName == "User has elevated their access to User Access Administrator for their Azure Resources"
+  | extend Actor = coalesce(tostring(InitiatedBy.user.userPrincipalName), tostring(InitiatedBy.app.displayName)),
+      ActorIP = tostring(InitiatedBy.user.ipAddress)
+  | project TimeGenerated, Actor, ActorIP, Result, Category
+entityMappings:
+  - entityType: Account
+    fieldMappings:
+      - identifier: FullName
+        columnName: Actor
+version: 1.0.0
+kind: Scheduled

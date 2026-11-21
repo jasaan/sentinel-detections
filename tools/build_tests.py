@@ -50,7 +50,22 @@ def kql_value(value, kind: str) -> str:
         return "dynamic(null)" if value is None else f"dynamic({json.dumps(value)})"
     if kind == "string":
         return kql_string("" if value is None else str(value))
+    if kind in ("int", "long"):
+        return f"{kind}(null)" if value is None else str(int(value))
+    if kind == "bool":
+        return "bool(null)" if value is None else str(bool(value)).lower()
     raise ValueError(f"Unsupported column type in test data: {kind}")
+
+
+def substitute(value, i: int):
+    """Replace '{i}' with the copy number in strings, including inside nested lists and maps."""
+    if isinstance(value, str):
+        return value.replace("{i}", str(i))
+    if isinstance(value, list):
+        return [substitute(v, i) for v in value]
+    if isinstance(value, dict):
+        return {k: substitute(v, i) for k, v in value.items()}
+    return value
 
 
 def expand_rows(rows: list[dict]) -> list[dict]:
@@ -63,9 +78,9 @@ def expand_rows(rows: list[dict]) -> list[dict]:
         for i in range(1, repeat + 1):
             new = {}
             for key, value in row.items():
-                if key.startswith("_") or key == "ago":
+                if key in ("_repeat", "_step", "ago"):
                     continue
-                new[key] = value.replace("{i}", str(i)) if isinstance(value, str) and repeat > 1 else value
+                new[key] = substitute(value, i) if repeat > 1 else value
             new["_ago_seconds"] = max(base - (i - 1) * step, 0)
             out.append(new)
     return out

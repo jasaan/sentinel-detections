@@ -1,0 +1,45 @@
+id: 8ed07189-bb2a-4953-b017-100ed171c72a
+name: Azure diagnostic settings, Log Analytics workspace or Sentinel rules deleted
+description: |
+  Deleting diagnostic settings stops logs flowing to Sentinel; deleting the workspace, analytics rules or data
+  connectors removes detection itself. Attackers who reach Azure control-plane rights do this before the noisy part.
+  Seen in: Storm-0501 and other cloud ransomware operators; a standard step in CISA's cloud defense-evasion guidance.
+  Tuning: infrastructure-as-code pipelines that recreate settings will appear; exclude their service principals by
+  object ID after confirming they only run from your pipeline.
+  Triage: restore the setting or rule, identify the caller and IP, and review the caller's other Azure activity in the
+  same hour.
+severity: High
+requiredDataConnectors:
+  - connectorId: AzureActivity
+    dataTypes:
+      - AzureActivity
+queryFrequency: 1h
+queryPeriod: 1h
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - DefenseEvasion
+relevantTechniques:
+  - T1562.008
+query: |
+  let TamperOps = dynamic(["MICROSOFT.INSIGHTS/DIAGNOSTICSETTINGS/DELETE", "MICROSOFT.OPERATIONALINSIGHTS/WORKSPACES/DELETE",
+      "MICROSOFT.OPERATIONALINSIGHTS/WORKSPACES/DATASOURCES/DELETE", "MICROSOFT.OPERATIONALINSIGHTS/WORKSPACES/DATACOLLECTIONRULES/DELETE",
+      "MICROSOFT.INSIGHTS/DATACOLLECTIONRULES/DELETE", "MICROSOFT.INSIGHTS/DATACOLLECTIONRULEASSOCIATIONS/DELETE",
+      "MICROSOFT.SECURITYINSIGHTS/ALERTRULES/DELETE", "MICROSOFT.SECURITYINSIGHTS/DATACONNECTORS/DELETE",
+      "MICROSOFT.SECURITYINSIGHTS/AUTOMATIONRULES/DELETE"]);
+  AzureActivity
+  | where TimeGenerated > ago(1h)
+  | where OperationNameValue in~ (TamperOps) and ActivityStatusValue in~ ("Success", "Succeeded")
+  | summarize FirstSeen = min(TimeGenerated), Operations = make_set(OperationNameValue), Resources = make_set(_ResourceId, 20)
+      by Caller, CallerIpAddress, SubscriptionId
+entityMappings:
+  - entityType: Account
+    fieldMappings:
+      - identifier: FullName
+        columnName: Caller
+  - entityType: IP
+    fieldMappings:
+      - identifier: Address
+        columnName: CallerIpAddress
+version: 1.0.0
+kind: Scheduled

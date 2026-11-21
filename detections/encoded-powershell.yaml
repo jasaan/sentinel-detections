@@ -1,0 +1,46 @@
+id: 367ecb4c-acde-4fa3-9096-a8563e6e1b63
+name: PowerShell run with a long encoded command
+description: |
+  -EncodedCommand (and its abbreviations, down to -e) takes base64 PowerShell, which hides the real script from casual
+  review and simple command-line rules. Long encoded commands from anything other than known management agents are
+  worth decoding. The Decoded column shows the script.
+  Seen in: Cobalt Strike, Empire and most PowerShell-based loaders.
+  Tuning: add your management agents (SCCM, Intune, RMM, backup) to ManagementParents after checking what they run.
+  Triage: read the Decoded column. Download cradles, AMSI bypasses or reflection mean isolate; vendor inventory scripts
+  mean add the parent to the allow-list.
+severity: Medium
+requiredDataConnectors:
+  - connectorId: MicrosoftThreatProtection
+    dataTypes:
+      - DeviceProcessEvents
+queryFrequency: 1h
+queryPeriod: 1h
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - Execution
+  - DefenseEvasion
+relevantTechniques:
+  - T1059.001
+  - T1027.010
+query: |
+  let ManagementParents = dynamic(["ccmexec.exe", "senseir.exe", "microsoft.management.services.intunewindowsagent.exe", "agentexecutor.exe"]);
+  DeviceProcessEvents
+  | where TimeGenerated > ago(1h)
+  | where FileName in~ ("powershell.exe", "pwsh.exe", "powershell_ise.exe")
+  | where InitiatingProcessFileName !in~ (ManagementParents)
+  | extend Encoded = extract(@"(?i)\s[-/]e(c|n|nc|nco|ncod|ncode|ncoded|ncodedc|ncodedco|ncodedcom|ncodedcomm|ncodedcomma|ncodedcomman|ncodedcommand)?\s+([A-Za-z0-9+/=]{100,})", 2, ProcessCommandLine)
+  | where isnotempty(Encoded)
+  | extend Decoded = replace_regex(base64_decode_tostring(Encoded), @"\x00", "")
+  | project TimeGenerated, DeviceName, AccountName, Decoded, ProcessCommandLine, InitiatingProcessFileName, InitiatingProcessCommandLine
+entityMappings:
+  - entityType: Host
+    fieldMappings:
+      - identifier: HostName
+        columnName: DeviceName
+  - entityType: Account
+    fieldMappings:
+      - identifier: Name
+        columnName: AccountName
+version: 1.0.0
+kind: Scheduled

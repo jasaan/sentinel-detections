@@ -1,0 +1,50 @@
+id: c9ab303c-a5d7-4302-8829-7e8288f53c86
+name: Email with a high-risk attachment type delivered to the inbox
+description: |
+  Disk images (ISO, IMG, VHD), shortcuts (LNK), scripts, OneNote files, SVG images and other formats that run code or
+  carry HTML smuggling are favorite loaders because they slip past older attachment filters. Few businesses need to
+  receive them by email.
+  Seen in: Qakbot, IcedID, Emotet and recent SVG-based credential phishing waves.
+  Tuning: if a supplier legitimately sends one of these types, allow-list that sender domain. Better still, add these
+  extensions to the anti-malware common attachments filter and keep this rule as a check that the filter works.
+  Triage: detonate or look up the hash, check whether the recipient opened it (DeviceFileEvents for the file name on
+  their device), and purge the message from all mailboxes.
+severity: Medium
+requiredDataConnectors:
+  - connectorId: MicrosoftThreatProtection
+    dataTypes:
+      - EmailAttachmentInfo
+      - EmailEvents
+queryFrequency: 1h
+queryPeriod: 1h
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - InitialAccess
+relevantTechniques:
+  - T1566.001
+query: |
+  let RiskyExtensions = dynamic(["iso", "img", "vhd", "vhdx", "lnk", "hta", "js", "jse", "vbs", "vbe", "wsf", "wsh", "one",
+      "chm", "scr", "cpl", "svg", "xll", "msc", "appx", "msix", "library-ms", "pif", "jar", "ps1", "bat", "cmd"]);
+  EmailAttachmentInfo
+  | where TimeGenerated > ago(1h)
+  | extend Extension = tolower(extract(@"\.([A-Za-z0-9\-]+)$", 1, FileName))
+  | where Extension in (RiskyExtensions) or tolower(FileType) in (RiskyExtensions)
+  | join kind=inner (
+      EmailEvents
+      | where TimeGenerated > ago(1h)
+      | where EmailDirection =~ "Inbound" and DeliveryAction =~ "Delivered" and DeliveryLocation !in~ ("Quarantine", "Junk folder")
+      | project NetworkMessageId, RecipientEmailAddress, Subject, SenderFromDomain, DeliveryLocation
+    ) on NetworkMessageId, RecipientEmailAddress
+  | summarize Recipients = make_set(RecipientEmailAddress, 50), RecipientCount = dcount(RecipientEmailAddress), FirstSeen = min(TimeGenerated)
+      by FileName, Extension, SHA256, SenderFromAddress, SenderFromDomain, Subject
+  | extend HashAlgorithm = "SHA256"
+entityMappings:
+  - entityType: FileHash
+    fieldMappings:
+      - identifier: Algorithm
+        columnName: HashAlgorithm
+      - identifier: Value
+        columnName: SHA256
+version: 1.0.0
+kind: Scheduled

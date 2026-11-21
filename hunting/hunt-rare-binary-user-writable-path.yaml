@@ -1,0 +1,31 @@
+id: 325a677b-72ef-4d12-8739-d24176a51e16
+name: Rare executables run from user-writable folders
+description: |
+  Malware usually runs from Downloads, AppData, Temp, Public or ProgramData, and a new payload's hash is seen on only one
+  or two devices. This hunt lists binaries run from those folders in the last day whose SHA256 appears on two or fewer
+  devices across the whole estate in the last week.
+  How to hunt: look the hashes up (Defender file page, VirusTotal), check the signer and the parent process. Anything
+  unsigned launched by an Office app, a browser or a script host comes first.
+requiredDataConnectors:
+  - connectorId: MicrosoftThreatProtection
+    dataTypes:
+      - DeviceProcessEvents
+tactics:
+  - Execution
+relevantTechniques:
+  - T1204.002
+query: |
+  let Prevalence = DeviceProcessEvents
+      | where TimeGenerated > ago(7d)
+      | where isnotempty(SHA256)
+      | summarize DeviceCount = dcount(DeviceName) by SHA256;
+  DeviceProcessEvents
+  | where TimeGenerated > ago(1d)
+  | where isnotempty(SHA256)
+  | where FolderPath matches regex @"(?i)\\(appdata|temp|downloads|users\\public|programdata|perflogs)\\"
+  | summarize FirstSeen = min(TimeGenerated), Executions = count(), Devices = make_set(DeviceName, 5), Paths = make_set(FolderPath, 5),
+      Parents = make_set(InitiatingProcessFileName, 5) by SHA256, FileName
+  | join kind=inner Prevalence on SHA256
+  | where DeviceCount <= 2
+  | project FirstSeen, FileName, SHA256, DeviceCount, Executions, Devices, Paths, Parents
+  | order by DeviceCount asc, FirstSeen desc

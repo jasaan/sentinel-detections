@@ -1,0 +1,14 @@
+rule: detections/dcsync-replication-by-non-dc.yaml
+description: A user account requesting replication rights fires; a domain controller and the MSOL sync account don't.
+data:
+  SecurityEvent:
+    - {ago: 15m, EventID: 4662, Computer: dc01.contoso.local, SubjectUserName: mallory, SubjectUserSid: S-1-5-21-1-2-3-1201, AccessMask: "0x100", Properties: "%%7688 {1131f6ad-9c07-11d1-f79f-00c04fc2dcd2} {19195a5b-6da0-11d0-afd3-00c04fd930c9}"}
+    - {ago: 15m, EventID: 4662, Computer: dc01.contoso.local, SubjectUserName: DC02$, SubjectUserSid: S-1-5-21-1-2-3-1001, AccessMask: "0x100", Properties: "%%7688 {1131f6ad-9c07-11d1-f79f-00c04fc2dcd2}"}
+    - {ago: 15m, EventID: 4662, Computer: dc01.contoso.local, SubjectUserName: MSOL_a1b2c3d4e5f6, SubjectUserSid: S-1-5-21-1-2-3-1301, AccessMask: "0x100", Properties: "%%7688 {1131f6aa-9c07-11d1-f79f-00c04fc2dcd2}"}
+expect:
+  rows: 1
+  include:
+    - {SubjectUserName: mallory}
+  exclude:
+    - {SubjectUserName: DC02$}
+    - {SubjectUserName: MSOL_a1b2c3d4e5f6}

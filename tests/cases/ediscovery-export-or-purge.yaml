@@ -1,0 +1,14 @@
+rule: detections/ediscovery-export-or-purge.yaml
+description: An export and a hard-delete purge fire; a preview action doesn't.
+data:
+  OfficeActivity:
+    - {ago: 10m, Operation: New-ComplianceSearchAction, OfficeWorkload: SecurityComplianceCenter, UserId: mallory@contoso.com, ClientIP: 198.51.100.29, Parameters: '[{"Name":"SearchName","Value":"all-exec-mail"},{"Name":"Export","Value":"True"}]'}
+    - {ago: 10m, Operation: New-ComplianceSearchAction, OfficeWorkload: SecurityComplianceCenter, UserId: mallory@contoso.com, ClientIP: 198.51.100.29, Parameters: '[{"Name":"SearchName","Value":"security-alerts"},{"Name":"Purge","Value":"True"},{"Name":"PurgeType","Value":"HardDelete"}]'}
+    - {ago: 10m, Operation: New-ComplianceSearchAction, OfficeWorkload: SecurityComplianceCenter, UserId: legal1@contoso.com, ClientIP: 203.0.113.29, Parameters: '[{"Name":"SearchName","Value":"case-123"},{"Name":"Preview","Value":"True"}]'}
+expect:
+  rows: 2
+  include:
+    - {Action: Export, SearchName: all-exec-mail}
+    - {Action: Purge, PurgeType: HardDelete}
+  exclude:
+    - {Actor: legal1@contoso.com}

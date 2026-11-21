@@ -1,0 +1,40 @@
+id: d2d81dea-875a-40f9-863e-fe0abc6e26be
+name: AWS KMS key disabled or scheduled for deletion
+description: |
+  Data encrypted with a deleted KMS key is gone for good. Attackers schedule key deletion (or disable keys) to destroy
+  data or hold it to ransom, sometimes after re-encrypting data with a key they control.
+  Tuning: key rotation projects and decommissioning disable or delete keys occasionally; match them to a ticket.
+  Triage: cancel the deletion (CancelKeyDeletion) or re-enable the key straight away; the 7-30 day waiting period is
+  your window. Then investigate the caller.
+severity: Medium
+requiredDataConnectors:
+  - connectorId: AWS
+    dataTypes:
+      - AWSCloudTrail
+queryFrequency: 1h
+queryPeriod: 1h
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - Impact
+relevantTechniques:
+  - T1485
+  - T1486
+query: |
+  AWSCloudTrail
+  | where TimeGenerated > ago(1h)
+  | where EventSource == "kms.amazonaws.com" and EventName in ("ScheduleKeyDeletion", "DisableKey") and isempty(ErrorCode)
+  | extend KeyId = tostring(parse_json(RequestParameters).keyId),
+      PendingDays = tostring(parse_json(RequestParameters).pendingWindowInDays)
+  | project TimeGenerated, EventName, KeyId, PendingDays, UserIdentityArn, SourceIpAddress, RecipientAccountId, AWSRegion
+entityMappings:
+  - entityType: Account
+    fieldMappings:
+      - identifier: Name
+        columnName: UserIdentityArn
+  - entityType: IP
+    fieldMappings:
+      - identifier: Address
+        columnName: SourceIpAddress
+version: 1.0.0
+kind: Scheduled

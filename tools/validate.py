@@ -1,9 +1,10 @@
 """Static checks for every detection and hunting query. Runs in CI on every push.
 
-Checks: required fields, unique GUIDs, severity and tactic values Sentinel accepts,
-MITRE ATT&CK technique ID format, that every table a query uses is declared in
-requiredDataConnectors and known to tools/schemas.py, that every rule has a test
-case, and that the generated KQL tests are up to date.
+Checks: required fields, unique GUIDs and names, severity and tactic values Sentinel
+accepts, MITRE ATT&CK technique ID format, that every table a query uses is declared in
+requiredDataConnectors and known to tools/schemas.py, that each description has its
+Tuning/Triage (rules) or How to hunt (hunts) guidance, that every rule has a test case,
+and that the generated tests, deployment templates and README catalog are up to date.
 """
 
 from __future__ import annotations
@@ -37,7 +38,7 @@ def tables_used(query: str) -> set[str]:
     return {t for t in SCHEMAS if re.search(rf"\b{t}\b", query)}
 
 
-def check_file(path: Path, kind: str, seen_ids: set[str]) -> list[str]:
+def check_file(path: Path, kind: str, seen_ids: set[str], seen_names: set[str]) -> list[str]:
     errors = []
     rel = path.relative_to(REPO)
     try:
@@ -87,6 +88,14 @@ def check_file(path: Path, kind: str, seen_ids: set[str]) -> list[str]:
     if re.search(r"\n\s*\n", doc["query"].strip()):
         errors.append(f"{rel}: query contains a blank line")
 
+    required_sections = ("Tuning:", "Triage:") if kind == "detection" else ("How to hunt:",)
+    for section in required_sections:
+        if section not in doc["description"]:
+            errors.append(f"{rel}: description needs a '{section}' paragraph")
+    if doc["name"] in seen_names:
+        errors.append(f"{rel}: duplicate name '{doc['name']}'")
+    seen_names.add(doc["name"])
+
     case = REPO / "tests" / "cases" / f"{path.stem}.yaml"
     if not case.exists():
         errors.append(f"{rel}: no test case at {case.relative_to(REPO)}")
@@ -96,20 +105,24 @@ def check_file(path: Path, kind: str, seen_ids: set[str]) -> list[str]:
 def main() -> None:
     errors: list[str] = []
     seen: set[str] = set()
+    names: set[str] = set()
     files = [(p, "detection") for p in sorted((REPO / "detections").glob("*.yaml"))]
     files += [(p, "hunting") for p in sorted((REPO / "hunting").glob("*.yaml"))]
     for path, kind in files:
-        errors += check_file(path, kind, seen)
+        errors += check_file(path, kind, seen, names)
 
-    build = subprocess.run([sys.executable, str(REPO / "tools" / "build_tests.py"), "--check"],
-                           capture_output=True, text=True)
-    if build.returncode != 0:
-        errors.append((build.stdout + build.stderr).strip())
+    summaries = []
+    for script in ("build_tests.py", "build_deploy.py", "build_docs.py"):
+        run = subprocess.run([sys.executable, str(REPO / "tools" / script), "--check"], capture_output=True, text=True)
+        if run.returncode != 0:
+            errors.append((run.stdout + run.stderr).strip())
+        else:
+            summaries.append(run.stdout.strip())
 
     if errors:
         print("\n".join(f"FAIL  {e}" for e in errors))
         sys.exit(1)
-    print(f"OK: {len(files)} queries validated; {build.stdout.strip()}")
+    print(f"OK: {len(files)} queries validated; " + "; ".join(summaries))
 
 
 if __name__ == "__main__":

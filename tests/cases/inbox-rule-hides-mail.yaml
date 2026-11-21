@@ -1,0 +1,16 @@
+rule: detections/inbox-rule-hides-mail.yaml
+description: A "." rule sending invoice mail to RSS Feeds and a ".." delete rule fire; a newsletter filter and an invoice-filing rule don't.
+data:
+  OfficeActivity:
+    - {ago: 20m, Operation: New-InboxRule, OfficeWorkload: Exchange, UserId: alice@contoso.com, ClientIP: 198.51.100.21, Parameters: '[{"Name":"Name","Value":"."},{"Name":"SubjectOrBodyContainsWords","Value":"invoice;payment;wire"},{"Name":"MoveToFolder","Value":"RSS Feeds"}]'}
+    - {ago: 20m, Operation: New-InboxRule, OfficeWorkload: Exchange, UserId: dave@contoso.com, ClientIP: 198.51.100.22, Parameters: '[{"Name":"Name","Value":".."},{"Name":"FromAddressContainsWords","Value":"it-security"},{"Name":"DeleteMessage","Value":"True"}]'}
+    - {ago: 20m, Operation: New-InboxRule, OfficeWorkload: Exchange, UserId: bob@contoso.com, ClientIP: 203.0.113.22, Parameters: '[{"Name":"Name","Value":"Newsletters"},{"Name":"FromAddressContainsWords","Value":"news@"},{"Name":"MoveToFolder","Value":"Archive"}]'}
+    - {ago: 20m, Operation: New-InboxRule, OfficeWorkload: Exchange, UserId: carol@contoso.com, ClientIP: 203.0.113.23, Parameters: '[{"Name":"Name","Value":"Vendor invoices"},{"Name":"SubjectContainsWords","Value":"invoice"},{"Name":"MoveToFolder","Value":"Vendors"}]'}
+expect:
+  rows: 2
+  include:
+    - {UserId: alice@contoso.com, RuleName: .}
+    - {UserId: dave@contoso.com, RuleName: ..}
+  exclude:
+    - {UserId: bob@contoso.com}
+    - {UserId: carol@contoso.com}

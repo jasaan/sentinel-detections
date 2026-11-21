@@ -1,0 +1,46 @@
+id: cc910e9a-9eed-455d-b7c1-fc710f9ca916
+name: Full Access or Send As granted on a mailbox
+description: |
+  FullAccess lets one account open another's mailbox; SendAs lets it send as them. Attackers with Exchange admin rights
+  grant themselves access to executives' or finance mailboxes for quiet collection and for payment fraud.
+  Tuning: assistants and shared mailboxes get these grants routinely; consider a watchlist of sensitive mailboxes
+  (executives, finance, legal) and alert only on those, or lower the severity for everything else.
+  Triage: confirm the grant with the mailbox owner. Remove it if unexpected, and check MailItemsAccessed for the grantee.
+severity: Medium
+requiredDataConnectors:
+  - connectorId: Office365
+    dataTypes:
+      - OfficeActivity
+queryFrequency: 1h
+queryPeriod: 1h
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - Persistence
+  - Collection
+relevantTechniques:
+  - T1098.002
+  - T1114.002
+query: |
+  OfficeActivity
+  | where TimeGenerated > ago(1h)
+  | where Operation in~ ("Add-MailboxPermission", "Add-RecipientPermission")
+  | where UserId !startswith "NT AUTHORITY"
+  | mv-apply P = todynamic(Parameters) on (
+      summarize Params = make_bag(bag_pack(tostring(P.Name), tostring(P.Value)))
+    )
+  | extend Mailbox = tostring(Params.Identity), Grantee = coalesce(tostring(Params.User), tostring(Params.Trustee)),
+      AccessRights = tostring(Params.AccessRights)
+  | where AccessRights has_any ("FullAccess", "SendAs")
+  | project TimeGenerated, Actor = UserId, ClientIP, Operation, Mailbox, Grantee, AccessRights
+entityMappings:
+  - entityType: Account
+    fieldMappings:
+      - identifier: FullName
+        columnName: Grantee
+  - entityType: Account
+    fieldMappings:
+      - identifier: FullName
+        columnName: Actor
+version: 1.0.0
+kind: Scheduled

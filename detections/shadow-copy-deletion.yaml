@@ -5,6 +5,8 @@ description: |
   files. These commands are rare in normal operations and usually come minutes before encryption starts.
   Tuning: allow-list documented backup software only after confirming its command lines. Treat any hit as a possible
   active incident.
+  Triage: Isolate the device now: shadow copy deletion is usually seconds before encryption. Then look for the same commands on
+  other hosts.
 severity: High
 requiredDataConnectors:
   - connectorId: MicrosoftThreatProtection

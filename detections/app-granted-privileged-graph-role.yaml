@@ -1,0 +1,53 @@
+id: ed9ba1aa-dace-45e8-b529-eb1a3b028132
+name: Application granted a high-privilege Microsoft Graph application permission
+description: |
+  Application permissions (app roles) let an app act on its own, without a user, across the whole tenant. Permissions
+  such as RoleManagement.ReadWrite.Directory or AppRoleAssignment.ReadWrite.All are effectively Global Admin, and
+  full_access_as_app or Mail.ReadWrite read every mailbox. Granting one should always be a reviewed change.
+  Seen in: Midnight Blizzard's 2024 intrusion at Microsoft (a legacy test app granted full_access_as_app and
+  RoleManagement rights).
+  Tuning: approved integrations will appear when first set up; record their app IDs and expect no repeats.
+  Triage: identify the app, its owner and who granted the permission. If unexpected, remove the app role assignment,
+  check for new credentials on the app (see the service principal credential hunt) and review its sign-ins.
+severity: High
+requiredDataConnectors:
+  - connectorId: AzureActiveDirectory
+    dataTypes:
+      - AuditLogs
+queryFrequency: 1h
+queryPeriod: 1h
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - Persistence
+  - PrivilegeEscalation
+relevantTechniques:
+  - T1098.003
+query: |
+  let PrivilegedAppRoles = dynamic(["RoleManagement.ReadWrite.Directory", "AppRoleAssignment.ReadWrite.All",
+      "Application.ReadWrite.All", "Directory.ReadWrite.All", "Domain.ReadWrite.All", "Policy.ReadWrite.ConditionalAccess",
+      "PrivilegedAccess.ReadWrite.AzureADGroup", "User.ReadWrite.All", "Group.ReadWrite.All", "Mail.ReadWrite",
+      "Mail.Send", "Mail.Read", "full_access_as_app", "Files.ReadWrite.All", "Sites.FullControl.All", "Sites.ReadWrite.All"]);
+  AuditLogs
+  | where TimeGenerated > ago(1h)
+  | where OperationName == "Add app role assignment to service principal" and Result =~ "success"
+  | mv-apply Prop = TargetResources[0].modifiedProperties on (
+      summarize Props = make_bag(bag_pack(tostring(Prop.displayName), trim(@'"', tostring(Prop.newValue))))
+    )
+  | extend AppRole = tostring(Props["AppRole.Value"]), ClientApp = tostring(Props["ServicePrincipal.DisplayName"]),
+      ClientAppId = tostring(Props["ServicePrincipal.AppId"]),
+      Actor = coalesce(tostring(InitiatedBy.user.userPrincipalName), tostring(InitiatedBy.app.displayName)),
+      ActorIP = tostring(InitiatedBy.user.ipAddress)
+  | where AppRole in (PrivilegedAppRoles)
+  | project TimeGenerated, ClientApp, ClientAppId, AppRole, ResourceApp = tostring(TargetResources[0].displayName), Actor, ActorIP
+entityMappings:
+  - entityType: CloudApplication
+    fieldMappings:
+      - identifier: Name
+        columnName: ClientApp
+  - entityType: Account
+    fieldMappings:
+      - identifier: FullName
+        columnName: Actor
+version: 1.0.0
+kind: Scheduled

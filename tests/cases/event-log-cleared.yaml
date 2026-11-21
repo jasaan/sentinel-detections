@@ -1,0 +1,17 @@
+rule: detections/event-log-cleared.yaml
+description: wevtutil cl Security and event 1102 fire; a wevtutil query and a logon event don't.
+data:
+  DeviceProcessEvents:
+    - {ago: 10m, DeviceName: fs01, AccountName: mallory, FileName: wevtutil.exe, ProcessCommandLine: 'wevtutil.exe cl Security', InitiatingProcessFileName: cmd.exe}
+    - {ago: 10m, DeviceName: it-ws-01, AccountName: alice, FileName: wevtutil.exe, ProcessCommandLine: 'wevtutil.exe qe Security /c:5 /f:text', InitiatingProcessFileName: cmd.exe}
+  SecurityEvent:
+    - {ago: 10m, EventID: 1102, Computer: dc01.contoso.local, SubjectUserName: mallory}
+    - {ago: 10m, EventID: 4624, Computer: dc02.contoso.local, SubjectUserName: alice}
+expect:
+  rows: 2
+  include:
+    - {HostName: fs01, Source: DeviceProcessEvents}
+    - {HostName: dc01.contoso.local, Source: SecurityEvent}
+  exclude:
+    - {HostName: it-ws-01}
+    - {HostName: dc02.contoso.local}

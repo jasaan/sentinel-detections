@@ -1,0 +1,13 @@
+rule: hunting/hunt-aws-activity-in-new-region.yaml
+description: RunInstances in a never-used region shows up; RunInstances in the usual region doesn't.
+data:
+  AWSCloudTrail:
+    - {ago: 10d, EventName: DescribeInstances, EventSource: ec2.amazonaws.com, AWSRegion: us-east-1, RecipientAccountId: "123456789012", UserIdentityArn: "arn:aws:iam::123456789012:user/ops", SourceIpAddress: 203.0.113.166}
+    - {ago: 3h, EventName: RunInstances, EventSource: ec2.amazonaws.com, AWSRegion: us-east-1, RecipientAccountId: "123456789012", UserIdentityArn: "arn:aws:iam::123456789012:user/ops", SourceIpAddress: 203.0.113.166}
+    - {ago: 3h, _repeat: 4, _step: 10s, EventName: RunInstances, EventSource: ec2.amazonaws.com, AWSRegion: ap-southeast-3, RecipientAccountId: "123456789012", UserIdentityArn: "arn:aws:iam::123456789012:user/ci-deploy", SourceIpAddress: 198.51.100.166}
+expect:
+  rows: 1
+  include:
+    - {AWSRegion: ap-southeast-3, Events: 4}
+  exclude:
+    - {AWSRegion: us-east-1}

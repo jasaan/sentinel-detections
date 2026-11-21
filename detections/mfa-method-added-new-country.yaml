@@ -5,6 +5,8 @@ description: |
   method followed within an hour by a successful sign-in from a country the user has not signed in from in two weeks is
   a strong account-takeover signal.
   Tuning: travelers will trigger this occasionally; the registration plus the new country together keep volume low.
+  Triage: Remove the new MFA method, revoke sessions, reset the password, and look for inbox rules or app consents added in
+  the same session.
 severity: High
 requiredDataConnectors:
   - connectorId: AzureActiveDirectory

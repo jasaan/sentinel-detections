@@ -1,0 +1,12 @@
+rule: detections/suspicious-service-created.yaml
+description: A remote service running cmd /c powershell fires and shows the target; a normal Program Files service doesn't.
+data:
+  DeviceProcessEvents:
+    - {ago: 10m, DeviceName: it-ws-05, AccountName: mallory, FileName: sc.exe, ProcessCommandLine: 'sc.exe \\fs01 create WinUpd binPath= "cmd.exe /c powershell -nop -w hidden -f C:\Users\Public\u.ps1" start= auto', InitiatingProcessFileName: cmd.exe}
+    - {ago: 10m, DeviceName: srv-app-02, AccountName: installer, FileName: sc.exe, ProcessCommandLine: 'sc.exe create AgentSvc binPath= "C:\Program Files\Agent\agent.exe" start= auto', InitiatingProcessFileName: msiexec.exe}
+expect:
+  rows: 1
+  include:
+    - {DeviceName: it-ws-05, RemoteTarget: '\\fs01'}
+  exclude:
+    - {DeviceName: srv-app-02}

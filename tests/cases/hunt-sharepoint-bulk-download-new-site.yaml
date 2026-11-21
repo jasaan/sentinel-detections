@@ -1,0 +1,13 @@
+rule: hunting/hunt-sharepoint-bulk-download-new-site.yaml
+description: Thirty downloads from a never-visited HR site show up; thirty from the user's usual team site don't.
+data:
+  OfficeActivity:
+    - {ago: 10d, Operation: FileAccessed, OfficeWorkload: SharePoint, UserId: alice@contoso.com, Site_Url: "https://contoso.sharepoint.com/sites/engineering", SourceFileName: design.docx, ClientIP: 203.0.113.164}
+    - {ago: 3h, _repeat: 30, _step: 10s, Operation: FileDownloaded, OfficeWorkload: SharePoint, UserId: alice@contoso.com, Site_Url: "https://contoso.sharepoint.com/sites/hr", SourceFileName: "salary-{i}.xlsx", ClientIP: 198.51.100.164}
+    - {ago: 3h, _repeat: 30, _step: 10s, Operation: FileDownloaded, OfficeWorkload: SharePoint, UserId: alice@contoso.com, Site_Url: "https://contoso.sharepoint.com/sites/engineering", SourceFileName: "spec-{i}.docx", ClientIP: 203.0.113.164}
+expect:
+  rows: 1
+  include:
+    - {Site_Url: "https://contoso.sharepoint.com/sites/hr", Files: 30}
+  exclude:
+    - {Site_Url: "https://contoso.sharepoint.com/sites/engineering"}

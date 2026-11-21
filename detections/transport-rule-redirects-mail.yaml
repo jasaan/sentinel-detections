@@ -1,0 +1,48 @@
+id: 84ef3e76-d1d6-4646-addd-b6dddd9ab7a1
+name: Exchange transport rule copies, redirects or deletes mail
+description: |
+  Transport (mail flow) rules apply to the whole organization. A rule that BCCs, redirects or silently deletes messages
+  lets an attacker with Exchange admin rights read or hide mail for everyone, and it survives password resets.
+  Tuning: legal journaling and compliance copies are the usual legitimate uses; they're set up rarely and on purpose.
+  Triage: review the rule (Get-TransportRule), who created it and from which IP. Disable it first if the destination is
+  outside the company, then investigate.
+severity: High
+requiredDataConnectors:
+  - connectorId: Office365
+    dataTypes:
+      - OfficeActivity
+queryFrequency: 1h
+queryPeriod: 1h
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - Collection
+  - Exfiltration
+  - DefenseEvasion
+relevantTechniques:
+  - T1114.003
+  - T1564.008
+query: |
+  let RiskyActions = dynamic(["BlindCopyTo", "RedirectMessageTo", "AddToRecipients", "CopyTo", "DeleteMessage",
+      "RouteMessageOutboundConnector", "ModerateMessageByUser"]);
+  OfficeActivity
+  | where TimeGenerated > ago(1h)
+  | where Operation in~ ("New-TransportRule", "Set-TransportRule")
+  | mv-apply P = todynamic(Parameters) on (
+      summarize Params = make_bag(bag_pack(tostring(P.Name), tostring(P.Value)))
+    )
+  | extend Actions = set_intersect(bag_keys(Params), RiskyActions),
+      BypassesSpam = tostring(Params.SetSCL) == "-1"
+  | where array_length(Actions) > 0 or BypassesSpam
+  | project TimeGenerated, Actor = UserId, ClientIP, Operation, RuleName = tostring(Params.Name), Actions, BypassesSpam, Parameters
+entityMappings:
+  - entityType: Account
+    fieldMappings:
+      - identifier: FullName
+        columnName: Actor
+  - entityType: IP
+    fieldMappings:
+      - identifier: Address
+        columnName: ClientIP
+version: 1.0.0
+kind: Scheduled

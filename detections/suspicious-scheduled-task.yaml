@@ -1,0 +1,41 @@
+id: 79092183-e1f8-46e2-91ee-3015975a3b23
+name: Scheduled task created that runs a script host, LOLBin or file from a user-writable folder
+description: |
+  Scheduled tasks are the most common persistence method on Windows. Tasks created from the command line that run
+  hidden PowerShell, mshta, rundll32 or a binary in AppData, Temp or Public are rarely legitimate.
+  Seen in: Qakbot, IcedID, Cobalt Strike operators and most commodity malware.
+  Tuning: some per-user updaters (browsers, chat apps) run from AppData; allow-list them by task name.
+  Triage: read the /tr command, delete the task (schtasks /delete /tn <name> /f), check whether it already ran, and
+  find the process that created it.
+severity: Medium
+requiredDataConnectors:
+  - connectorId: MicrosoftThreatProtection
+    dataTypes:
+      - DeviceProcessEvents
+queryFrequency: 1h
+queryPeriod: 1h
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - Persistence
+  - Execution
+relevantTechniques:
+  - T1053.005
+query: |
+  DeviceProcessEvents
+  | where TimeGenerated > ago(1h)
+  | where FileName =~ "schtasks.exe" and ProcessCommandLine matches regex @"(?i)\s/create\s"
+  | where ProcessCommandLine matches regex @"(?i)/tr\s+.*(powershell.*\s-(e|ec|enc|encodedcommand|w\s+hidden|windowstyle\s+hidden)\b|mshta|rundll32|regsvr32|wscript|cscript|certutil|bitsadmin|https?://|\\(appdata|temp|users\\public|programdata|perflogs)\\)"
+  | extend TaskName = extract(@"(?i)/tn\s+(""[^""]+""|\S+)", 1, ProcessCommandLine)
+  | project TimeGenerated, DeviceName, AccountName, TaskName, ProcessCommandLine, InitiatingProcessFileName, InitiatingProcessCommandLine
+entityMappings:
+  - entityType: Host
+    fieldMappings:
+      - identifier: HostName
+        columnName: DeviceName
+  - entityType: Account
+    fieldMappings:
+      - identifier: Name
+        columnName: AccountName
+version: 1.0.0
+kind: Scheduled

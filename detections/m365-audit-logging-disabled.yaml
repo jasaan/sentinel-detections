@@ -1,0 +1,45 @@
+id: 2d06dc9a-e52a-424c-a5b3-73474d19e138
+name: Microsoft 365 audit logging turned off or bypassed
+description: |
+  Turning off unified audit log ingestion, disabling mailbox auditing, or adding an audit bypass for an account blinds
+  every rule that reads OfficeActivity. Attackers do this before reading mail at scale.
+  Seen in: Midnight Blizzard and other actors targeting Microsoft 365 mail (Mandiant and CISA guidance on M365 logging).
+  Tuning: there should be no legitimate reason for these changes in production; investigate every one.
+  Triage: re-enable auditing immediately, identify the account and IP that made the change, and assume that account is
+  compromised until shown otherwise.
+severity: High
+requiredDataConnectors:
+  - connectorId: Office365
+    dataTypes:
+      - OfficeActivity
+queryFrequency: 1h
+queryPeriod: 1h
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - DefenseEvasion
+relevantTechniques:
+  - T1562.008
+query: |
+  OfficeActivity
+  | where TimeGenerated > ago(1h)
+  | where Operation in~ ("Set-AdminAuditLogConfig", "Set-Mailbox", "Set-MailboxAuditBypassAssociation", "Set-OrganizationConfig")
+  | mv-apply P = todynamic(Parameters) on (
+      summarize Params = make_bag(bag_pack(tostring(P.Name), tostring(P.Value)))
+    )
+  | where (Operation =~ "Set-AdminAuditLogConfig" and (tostring(Params.UnifiedAuditLogIngestionEnabled) =~ "False" or tostring(Params.AdminAuditLogEnabled) =~ "False"))
+      or (Operation =~ "Set-Mailbox" and tostring(Params.AuditEnabled) =~ "False")
+      or (Operation =~ "Set-MailboxAuditBypassAssociation" and tostring(Params.AuditBypassEnabled) =~ "True")
+      or (Operation =~ "Set-OrganizationConfig" and tostring(Params.AuditDisabled) =~ "True")
+  | project TimeGenerated, Actor = UserId, ClientIP, Operation, Target = tostring(Params.Identity), Parameters
+entityMappings:
+  - entityType: Account
+    fieldMappings:
+      - identifier: FullName
+        columnName: Actor
+  - entityType: IP
+    fieldMappings:
+      - identifier: Address
+        columnName: ClientIP
+version: 1.0.0
+kind: Scheduled

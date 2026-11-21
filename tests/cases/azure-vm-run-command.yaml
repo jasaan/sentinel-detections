@@ -1,0 +1,14 @@
+rule: detections/azure-vm-run-command.yaml
+description: A first-time Run Command caller fires; a caller who used it last week doesn't.
+data:
+  AzureActivity:
+    - {ago: 20m, OperationNameValue: MICROSOFT.COMPUTE/VIRTUALMACHINES/RUNCOMMAND/ACTION, ActivityStatusValue: Success, Caller: mallory@contoso.com, CallerIpAddress: 198.51.100.105, SubscriptionId: sub-1, _ResourceId: /subscriptions/sub-1/resourceGroups/prod/providers/Microsoft.Compute/virtualMachines/sql01}
+    - {ago: 20m, OperationNameValue: MICROSOFT.COMPUTE/VIRTUALMACHINES/RUNCOMMAND/ACTION, ActivityStatusValue: Success, Caller: mallory@contoso.com, CallerIpAddress: 198.51.100.105, SubscriptionId: sub-1, _ResourceId: /subscriptions/sub-1/resourceGroups/prod/providers/Microsoft.Compute/virtualMachines/app01}
+    - {ago: 7d, OperationNameValue: MICROSOFT.COMPUTE/VIRTUALMACHINES/RUNCOMMAND/ACTION, ActivityStatusValue: Success, Caller: ops-automation@contoso.com, CallerIpAddress: 203.0.113.105, SubscriptionId: sub-1, _ResourceId: /subscriptions/sub-1/resourceGroups/prod/providers/Microsoft.Compute/virtualMachines/web01}
+    - {ago: 20m, OperationNameValue: MICROSOFT.COMPUTE/VIRTUALMACHINES/RUNCOMMAND/ACTION, ActivityStatusValue: Success, Caller: ops-automation@contoso.com, CallerIpAddress: 203.0.113.105, SubscriptionId: sub-1, _ResourceId: /subscriptions/sub-1/resourceGroups/prod/providers/Microsoft.Compute/virtualMachines/web01}
+expect:
+  rows: 1
+  include:
+    - {Caller: mallory@contoso.com, VMCount: 2}
+  exclude:
+    - {Caller: ops-automation@contoso.com}

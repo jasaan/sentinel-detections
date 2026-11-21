@@ -1,0 +1,40 @@
+id: 0b8e1d7b-0f9a-4578-a284-0dc0d6e26c29
+name: AWS console sign-in by an IAM user without MFA
+description: |
+  A successful console sign-in by an IAM user (or root) with no MFA means a password alone opened the console. Stolen
+  IAM passwords are common in infostealer logs.
+  Tuning: users who sign in through IAM Identity Center or a federated IdP appear as assumed roles and are excluded.
+  The fix for repeat offenders is an IAM policy that denies everything without aws:MultiFactorAuthPresent.
+  Triage: confirm with the user, enforce MFA on the account, and review the session's API calls.
+severity: Medium
+requiredDataConnectors:
+  - connectorId: AWS
+    dataTypes:
+      - AWSCloudTrail
+queryFrequency: 1h
+queryPeriod: 1h
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - InitialAccess
+relevantTechniques:
+  - T1078.004
+query: |
+  AWSCloudTrail
+  | where TimeGenerated > ago(1h)
+  | where EventName == "ConsoleLogin" and ResponseElements contains '"ConsoleLogin":"Success"'
+  | where UserIdentityType in ("IAMUser", "Root")
+  | where AdditionalEventData contains '"MFAUsed":"No"'
+  | extend User = iff(isnotempty(UserIdentityUserName), UserIdentityUserName, UserIdentityArn)
+  | project TimeGenerated, User, UserIdentityArn, SourceIpAddress, UserAgent, RecipientAccountId
+entityMappings:
+  - entityType: Account
+    fieldMappings:
+      - identifier: Name
+        columnName: User
+  - entityType: IP
+    fieldMappings:
+      - identifier: Address
+        columnName: SourceIpAddress
+version: 1.0.0
+kind: Scheduled

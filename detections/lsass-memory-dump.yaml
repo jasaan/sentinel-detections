@@ -1,0 +1,43 @@
+id: 2893fd3d-cbc3-4e0d-aab7-698a0bdb4d6e
+name: LSASS memory dump by command line
+description: |
+  Dumping the memory of lsass.exe gives an attacker every credential cached on the machine: NTLM hashes, Kerberos
+  tickets and sometimes clear-text passwords. Common methods are the comsvcs.dll MiniDump export through rundll32,
+  ProcDump with -ma against lsass, and tools such as Mimikatz, nanodump and lsassy.
+  Seen in: almost every hands-on-keyboard ransomware intrusion (The DFIR Report documents it repeatedly).
+  Tuning: support engineers occasionally dump lsass for Microsoft cases; those should be rare and ticketed. Turning on
+  the ASR rule "Block credential stealing from LSASS" and Credential Guard prevents most of these.
+  Triage: isolate the device, reset passwords for every account that signed in to it recently (privileged ones first),
+  and look for the dump file being copied off the machine.
+severity: High
+requiredDataConnectors:
+  - connectorId: MicrosoftThreatProtection
+    dataTypes:
+      - DeviceProcessEvents
+queryFrequency: 1h
+queryPeriod: 1h
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - CredentialAccess
+relevantTechniques:
+  - T1003.001
+query: |
+  DeviceProcessEvents
+  | where TimeGenerated > ago(1h)
+  | where (FileName =~ "rundll32.exe" and ProcessCommandLine matches regex @"(?i)comsvcs(\.dll)?[\s,]+(minidump|#\s*24)")
+      or ((FileName in~ ("procdump.exe", "procdump64.exe") or ProcessVersionInfoOriginalFileName in~ ("procdump", "procdump.exe"))
+          and ProcessCommandLine has "lsass")
+      or ProcessCommandLine matches regex @"(?i)sekurlsa::|out-minidump|nanodump|lsassy|pypykatz|mimikatz"
+  | project TimeGenerated, DeviceName, AccountName, FileName, ProcessCommandLine, InitiatingProcessFileName, InitiatingProcessCommandLine
+entityMappings:
+  - entityType: Host
+    fieldMappings:
+      - identifier: HostName
+        columnName: DeviceName
+  - entityType: Account
+    fieldMappings:
+      - identifier: Name
+        columnName: AccountName
+version: 1.0.0
+kind: Scheduled

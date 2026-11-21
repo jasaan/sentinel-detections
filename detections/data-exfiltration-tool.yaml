@@ -1,0 +1,44 @@
+id: 9a96169d-8c37-44b9-a796-d313231b5499
+name: Cloud sync tool used to copy data out (rclone, MEGA, restic)
+description: |
+  Ransomware crews steal data before encrypting, and rclone (often renamed to look like a system file) is their
+  favorite tool, with MEGA, restic and similar close behind. This catches rclone by name, by its original file name
+  when renamed, and by its distinctive flags.
+  Seen in: Conti, BlackCat, LockBit, Royal and Scattered Spider data theft (CISA #StopRansomware advisories).
+  Tuning: if IT uses rclone for migrations, allow-list the specific device and account rather than the tool.
+  Triage: identify the remote (the "name:" before the path, and the rclone.conf file), estimate what was copied, block
+  the destination, and treat it as a likely ransomware precursor: hunt for credential dumping and backup deletion.
+severity: High
+requiredDataConnectors:
+  - connectorId: MicrosoftThreatProtection
+    dataTypes:
+      - DeviceProcessEvents
+queryFrequency: 1h
+queryPeriod: 1h
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - Exfiltration
+relevantTechniques:
+  - T1567.002
+  - T1036.003
+query: |
+  DeviceProcessEvents
+  | where TimeGenerated > ago(1h)
+  | extend IsRclone = FileName in~ ("rclone.exe", "rclone") or ProcessVersionInfoOriginalFileName =~ "rclone.exe"
+  | where (IsRclone and ProcessCommandLine matches regex @"(?i)\s(copy|sync|move|copyto|moveto)\s")
+      or ProcessCommandLine matches regex @"(?i)\s(copy|sync)\s.*\s[\w\-]+:\S*.*--(transfers|multi-thread-streams|no-check-certificate|ignore-existing|max-age)"
+      or FileName in~ ("megacmd.exe", "megacmdserver.exe", "mega-put.exe", "megasync.exe", "restic.exe", "restic")
+  | extend Renamed = IsRclone and FileName !in~ ("rclone.exe", "rclone")
+  | project TimeGenerated, DeviceName, AccountName, FileName, Renamed, ProcessCommandLine, FolderPath, InitiatingProcessFileName
+entityMappings:
+  - entityType: Host
+    fieldMappings:
+      - identifier: HostName
+        columnName: DeviceName
+  - entityType: Account
+    fieldMappings:
+      - identifier: Name
+        columnName: AccountName
+version: 1.0.0
+kind: Scheduled

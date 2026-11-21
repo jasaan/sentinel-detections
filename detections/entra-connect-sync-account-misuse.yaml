@@ -1,0 +1,42 @@
+id: 60415d43-6147-437a-b74c-a265cbd4514c
+name: Entra Connect sync account used outside directory sync
+description: |
+  The Entra Connect sync account (Sync_<server>_<id>@<tenant>.onmicrosoft.com) has broad directory rights and is
+  excluded from MFA in many tenants. It should only ever talk to the directory sync service. If it signs in to the
+  Azure portal, Graph Explorer, PowerShell or anything else, someone has taken its credentials from the sync server.
+  Seen in: Storm-0501 ransomware operations (2024), which moved from on-premises AD to Entra ID through the sync server.
+  Tuning: add the app name your sync account actually uses if it differs (check a week of its sign-ins first).
+  Triage: treat the sync server as compromised. Rotate the sync account password from the Entra Connect wizard, review
+  directory changes made by the account and check the server for credential theft.
+severity: High
+requiredDataConnectors:
+  - connectorId: AzureActiveDirectory
+    dataTypes:
+      - SigninLogs
+      - AADNonInteractiveUserSignInLogs
+queryFrequency: 1h
+queryPeriod: 1h
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - PrivilegeEscalation
+  - LateralMovement
+relevantTechniques:
+  - T1078.004
+  - T1078.002
+query: |
+  let SyncApps = dynamic(["Microsoft Azure Active Directory Connect", "Microsoft Entra Connect", "Microsoft Online Syncfabric"]);
+  union
+      (SigninLogs | where TimeGenerated > ago(1h)),
+      (AADNonInteractiveUserSignInLogs | where TimeGenerated > ago(1h))
+  | where UserPrincipalName startswith "sync_" and ResultType == "0"
+  | where AppDisplayName !in~ (SyncApps)
+  | summarize FirstSeen = min(TimeGenerated), Apps = make_set(AppDisplayName, 10), IPs = make_set(IPAddress, 10),
+      UserAgents = make_set(UserAgent, 5) by UserPrincipalName
+entityMappings:
+  - entityType: Account
+    fieldMappings:
+      - identifier: FullName
+        columnName: UserPrincipalName
+version: 1.0.0
+kind: Scheduled

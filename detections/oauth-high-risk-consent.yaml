@@ -5,6 +5,8 @@ description: |
   data without needing a password or MFA.
   Tuning: adjust HighRiskScopes to your policy. Known business apps can be excluded by AppId after review; better still,
   restrict user consent in Entra ID so this rule mostly fires on admin consent.
+  Triage: Review the app's publisher and permissions. If suspicious, revoke the grant, disable the service principal and check
+  what it accessed (Graph activity logs, MailItemsAccessed).
 severity: High
 requiredDataConnectors:
   - connectorId: AzureActiveDirectory

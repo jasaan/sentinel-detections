@@ -1,0 +1,42 @@
+id: 0e11453a-1b30-47fa-810c-1b50c256ccdc
+name: Microsoft Defender protections disabled or excluded from the command line
+description: |
+  Turning off real-time protection, adding broad exclusions, removing signatures or stopping the Defender services
+  clears the way for ransomware and tooling. Attackers usually do this minutes before the payload runs.
+  Seen in: BlackCat/ALPHV, LockBit, Black Basta and most other ransomware affiliates.
+  Tuning: software installers sometimes add narrow exclusions for their own folder; turn on Tamper Protection and manage
+  exclusions through Intune so command-line changes stand out.
+  Triage: check what was excluded or disabled, look for files dropped in that path, and restore protection. A Defender
+  change plus credential-dumping or shadow-copy activity on the same device means isolate now.
+severity: High
+requiredDataConnectors:
+  - connectorId: MicrosoftThreatProtection
+    dataTypes:
+      - DeviceProcessEvents
+queryFrequency: 1h
+queryPeriod: 1h
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - DefenseEvasion
+relevantTechniques:
+  - T1562.001
+query: |
+  DeviceProcessEvents
+  | where TimeGenerated > ago(1h)
+  | where ProcessCommandLine matches regex @"(?i)set-mppreference.*-disable(realtimemonitoring|behaviormonitoring|ioavprotection|scriptscanning|blockatfirstseen|intrusionpreventionsystem|archivescanning)\s+(\$true|1)"
+      or ProcessCommandLine matches regex @"(?i)(add|set)-mppreference.*-exclusion(path|process|extension|ipaddress)"
+      or ProcessCommandLine matches regex @"(?i)mpcmdrun(\.exe)?.*-removedefinitions"
+      or (FileName =~ "sc.exe" and ProcessCommandLine matches regex @"(?i)\b(stop|delete|config)\b.*\b(windefend|sense|wdboot|wdfilter|wdnissvc)\b")
+  | project TimeGenerated, DeviceName, AccountName, FileName, ProcessCommandLine, InitiatingProcessFileName, InitiatingProcessCommandLine
+entityMappings:
+  - entityType: Host
+    fieldMappings:
+      - identifier: HostName
+        columnName: DeviceName
+  - entityType: Account
+    fieldMappings:
+      - identifier: Name
+        columnName: AccountName
+version: 1.0.0
+kind: Scheduled

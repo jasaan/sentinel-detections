@@ -4,6 +4,8 @@ description: |
   Conditional Access enforces MFA and device rules. Deleting a policy, or switching it from enforced to off or
   report-only, removes a control at once and is a known step in tenant takeover.
   Tuning: changes should go through change management; correlate alerts with approved change tickets.
+  Triage: Re-enable or restore the policy, confirm the change with the actor, and review sign-ins that the policy would have
+  blocked while it was off.
 severity: High
 requiredDataConnectors:
   - connectorId: AzureActiveDirectory

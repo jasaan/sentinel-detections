@@ -1,0 +1,44 @@
+id: afaa635d-26b0-4311-bd4d-086eed0ac127
+name: Service created that runs a shell, script or binary from a user-writable folder
+description: |
+  Services run as SYSTEM and start at boot, so attackers create them for persistence and to execute payloads on
+  remote hosts (sc \\host create ...). Real software installs services from Program Files, not from Temp or Public, and
+  not as "cmd /c powershell ...".
+  Seen in: Cobalt Strike's service-based lateral movement, PsExec-style tooling and many ransomware deployments.
+  Tuning: a few in-house tools might install from ProgramData; allow-list their exact binPath.
+  Triage: get the binPath, check whether the service ran and what it started, delete it, and look for the same service
+  name on other hosts.
+severity: Medium
+requiredDataConnectors:
+  - connectorId: MicrosoftThreatProtection
+    dataTypes:
+      - DeviceProcessEvents
+queryFrequency: 1h
+queryPeriod: 1h
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - Persistence
+  - Execution
+  - LateralMovement
+relevantTechniques:
+  - T1543.003
+  - T1569.002
+query: |
+  DeviceProcessEvents
+  | where TimeGenerated > ago(1h)
+  | where FileName =~ "sc.exe" and ProcessCommandLine matches regex @"(?i)\screate\s"
+  | where ProcessCommandLine matches regex @"(?i)binpath=\s*.*(cmd(\.exe)?\s+/c|powershell|pwsh|mshta|rundll32|regsvr32|%comspec%|\\(appdata|temp|users\\public|programdata|perflogs)\\|\\\\127\.0\.0\.1\\)"
+  | extend RemoteTarget = extract(@"(?i)sc(\.exe)?\s+(\\\\[^\s]+)\s+create", 2, ProcessCommandLine)
+  | project TimeGenerated, DeviceName, AccountName, RemoteTarget, ProcessCommandLine, InitiatingProcessFileName, InitiatingProcessCommandLine
+entityMappings:
+  - entityType: Host
+    fieldMappings:
+      - identifier: HostName
+        columnName: DeviceName
+  - entityType: Account
+    fieldMappings:
+      - identifier: Name
+        columnName: AccountName
+version: 1.0.0
+kind: Scheduled

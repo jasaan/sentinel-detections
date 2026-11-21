@@ -1,0 +1,42 @@
+id: ef0a67fe-be8b-41e2-851b-ab68f1f7ea38
+name: Compliance search exported or used to purge mail
+description: |
+  eDiscovery content search can export any mailbox in the organization or hard-delete matching messages everywhere.
+  Attackers with compliance roles use export to steal mail in bulk and purge to remove their phishing emails or alerts.
+  Tuning: legal and security teams run these; list their accounts and lower the severity for them rather than
+  excluding them, since their accounts are prime targets too.
+  Triage: check the search query and which mailboxes it covered (Get-ComplianceSearch), and confirm with legal or
+  security that the export or purge was requested.
+severity: Medium
+requiredDataConnectors:
+  - connectorId: Office365
+    dataTypes:
+      - OfficeActivity
+queryFrequency: 1h
+queryPeriod: 1h
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - Collection
+  - DefenseEvasion
+relevantTechniques:
+  - T1114.002
+  - T1070.008
+query: |
+  OfficeActivity
+  | where TimeGenerated > ago(1h)
+  | where Operation =~ "New-ComplianceSearchAction"
+  | mv-apply P = todynamic(Parameters) on (
+      summarize Params = make_bag(bag_pack(tostring(P.Name), tostring(P.Value)))
+    )
+  | extend Action = case(isnotnull(Params.Purge), "Purge", isnotnull(Params.Export), "Export", "Other")
+  | where Action != "Other"
+  | project TimeGenerated, Actor = UserId, ClientIP, Action, SearchName = tostring(Params.SearchName),
+      PurgeType = tostring(Params.PurgeType), Parameters
+entityMappings:
+  - entityType: Account
+    fieldMappings:
+      - identifier: FullName
+        columnName: Actor
+version: 1.0.0
+kind: Scheduled

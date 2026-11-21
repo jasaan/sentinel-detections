@@ -1,0 +1,12 @@
+rule: detections/app-granted-privileged-graph-role.yaml
+description: Granting RoleManagement.ReadWrite.Directory fires; granting User.Read.All doesn't.
+data:
+  AuditLogs:
+    - {ago: 10m, OperationName: Add app role assignment to service principal, Result: success, Category: ApplicationManagement, InitiatedBy: {user: {userPrincipalName: admin1@contoso.com, ipAddress: 198.51.100.30}}, TargetResources: [{displayName: Microsoft Graph, modifiedProperties: [{displayName: AppRole.Value, newValue: '"RoleManagement.ReadWrite.Directory"'}, {displayName: ServicePrincipal.DisplayName, newValue: '"BackupSync"'}, {displayName: ServicePrincipal.AppId, newValue: '"11111111-aaaa-bbbb-cccc-000000000001"'}]}]}
+    - {ago: 10m, OperationName: Add app role assignment to service principal, Result: success, Category: ApplicationManagement, InitiatedBy: {user: {userPrincipalName: admin2@contoso.com, ipAddress: 203.0.113.30}}, TargetResources: [{displayName: Microsoft Graph, modifiedProperties: [{displayName: AppRole.Value, newValue: '"User.Read.All"'}, {displayName: ServicePrincipal.DisplayName, newValue: '"HRConnector"'}]}]}
+expect:
+  rows: 1
+  include:
+    - {ClientApp: BackupSync, AppRole: RoleManagement.ReadWrite.Directory, Actor: admin1@contoso.com}
+  exclude:
+    - {ClientApp: HRConnector}

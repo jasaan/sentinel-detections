@@ -1,0 +1,18 @@
+rule: hunting/hunt-clicked-link-new-sender-domain.yaml
+description: Two users clicking a link from a brand-new lookalike domain show up; a click on mail from a long-standing supplier doesn't.
+data:
+  EmailEvents:
+    - {ago: 10d, NetworkMessageId: old-1, RecipientEmailAddress: alice@contoso.com, SenderFromAddress: billing@supplier.example, SenderFromDomain: supplier.example, Subject: Statement, EmailDirection: Inbound, DeliveryAction: Delivered}
+    - {ago: 5h, NetworkMessageId: new-1, RecipientEmailAddress: alice@contoso.com, SenderFromAddress: it@contoso-support.example, SenderFromDomain: contoso-support.example, Subject: Password expiry, EmailDirection: Inbound, DeliveryAction: Delivered}
+    - {ago: 5h, NetworkMessageId: new-1, RecipientEmailAddress: bob@contoso.com, SenderFromAddress: it@contoso-support.example, SenderFromDomain: contoso-support.example, Subject: Password expiry, EmailDirection: Inbound, DeliveryAction: Delivered}
+    - {ago: 5h, NetworkMessageId: sup-2, RecipientEmailAddress: carol@contoso.com, SenderFromAddress: billing@supplier.example, SenderFromDomain: supplier.example, Subject: Invoice, EmailDirection: Inbound, DeliveryAction: Delivered}
+  UrlClickEvents:
+    - {ago: 4h, NetworkMessageId: new-1, AccountUpn: alice@contoso.com, Url: "https://contoso-support.example/reset", ActionType: ClickAllowed, IsClickedThrough: false}
+    - {ago: 4h, NetworkMessageId: new-1, AccountUpn: bob@contoso.com, Url: "https://contoso-support.example/reset", ActionType: ClickAllowed, IsClickedThrough: false}
+    - {ago: 4h, NetworkMessageId: sup-2, AccountUpn: carol@contoso.com, Url: "https://supplier.example/invoice", ActionType: ClickAllowed, IsClickedThrough: false}
+expect:
+  rows: 1
+  include:
+    - {SenderFromDomain: contoso-support.example, ClickerCount: 2}
+  exclude:
+    - {SenderFromDomain: supplier.example}

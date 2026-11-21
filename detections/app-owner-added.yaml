@@ -1,0 +1,42 @@
+id: cffc4f57-11f8-4431-80fe-7c4f1478a894
+name: New owner added to an application or service principal
+description: |
+  Owners of an app registration or service principal can add client secrets and certificates to it, then sign in as
+  the app with all of its permissions. Adding an owner is a low-visibility way to take over a privileged app.
+  Tuning: developer teams add owners during normal work; consider scoping to apps with high-privilege permissions by
+  adding a watchlist of app IDs, and skip the alert when the actor adds themselves to an app they created that day.
+  Triage: check whether the new owner works on that app and whether new credentials were added to it afterwards.
+severity: Medium
+requiredDataConnectors:
+  - connectorId: AzureActiveDirectory
+    dataTypes:
+      - AuditLogs
+queryFrequency: 1h
+queryPeriod: 1h
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - Persistence
+  - PrivilegeEscalation
+relevantTechniques:
+  - T1098
+query: |
+  AuditLogs
+  | where TimeGenerated > ago(1h)
+  | where OperationName in ("Add owner to application", "Add owner to service principal") and Result =~ "success"
+  | extend NewOwner = coalesce(tostring(TargetResources[0].userPrincipalName), tostring(TargetResources[0].displayName)),
+      App = tostring(TargetResources[1].displayName), AppObjectId = tostring(TargetResources[1].id),
+      Actor = coalesce(tostring(InitiatedBy.user.userPrincipalName), tostring(InitiatedBy.app.displayName)),
+      ActorIP = tostring(InitiatedBy.user.ipAddress)
+  | project TimeGenerated, OperationName, App, AppObjectId, NewOwner, Actor, ActorIP
+entityMappings:
+  - entityType: Account
+    fieldMappings:
+      - identifier: FullName
+        columnName: NewOwner
+  - entityType: CloudApplication
+    fieldMappings:
+      - identifier: Name
+        columnName: App
+version: 1.0.0
+kind: Scheduled

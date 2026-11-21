@@ -1,0 +1,14 @@
+rule: detections/ransomware-mass-file-rename.yaml
+description: 150 files renamed to .lockd fires; Office turning 150 .tmp files into .docx and 20 renames to .bak2 don't.
+data:
+  DeviceFileEvents:
+    - {ago: 8m, _repeat: 150, _step: 1s, DeviceName: fs01, ActionType: FileRenamed, FileName: "report{i}.xlsx.lockd", PreviousFileName: "report{i}.xlsx", FolderPath: 'D:\Shares\Finance\report{i}.xlsx.lockd', InitiatingProcessFileName: svcupd.exe, InitiatingProcessCommandLine: 'svcupd.exe -p D:\Shares', InitiatingProcessAccountName: mallory}
+    - {ago: 8m, _repeat: 150, _step: 1s, DeviceName: it-ws-01, ActionType: FileRenamed, FileName: "notes{i}.docx", PreviousFileName: "~WRD{i}.tmp", FolderPath: 'C:\Users\alice\Documents\notes{i}.docx', InitiatingProcessFileName: WINWORD.EXE, InitiatingProcessCommandLine: WINWORD.EXE, InitiatingProcessAccountName: alice}
+    - {ago: 8m, _repeat: 20, _step: 1s, DeviceName: it-ws-02, ActionType: FileRenamed, FileName: "cfg{i}.bak2", PreviousFileName: "cfg{i}.ini", FolderPath: 'C:\App\cfg{i}.bak2', InitiatingProcessFileName: updater.exe, InitiatingProcessCommandLine: updater.exe, InitiatingProcessAccountName: system}
+expect:
+  rows: 1
+  include:
+    - {DeviceName: fs01, NewExt: lockd, Renamed: 150}
+  exclude:
+    - {DeviceName: it-ws-01}
+    - {DeviceName: it-ws-02}

@@ -1,0 +1,16 @@
+rule: detections/lsass-memory-dump.yaml
+description: A comsvcs MiniDump and ProcDump against lsass fire; ProcDump of a web worker and a normal rundll32 call don't.
+data:
+  DeviceProcessEvents:
+    - {ago: 10m, DeviceName: fin-ws-07, AccountName: mallory, FileName: rundll32.exe, ProcessCommandLine: 'rundll32.exe C:\Windows\System32\comsvcs.dll, MiniDump 624 C:\Windows\Temp\l.dmp full', InitiatingProcessFileName: powershell.exe}
+    - {ago: 10m, DeviceName: srv-app-02, AccountName: mallory, FileName: pd64.exe, ProcessVersionInfoOriginalFileName: procdump, ProcessCommandLine: 'pd64.exe -accepteula -ma lsass.exe C:\Users\Public\out.dmp', InitiatingProcessFileName: cmd.exe}
+    - {ago: 10m, DeviceName: srv-web-01, AccountName: webadmin, FileName: procdump64.exe, ProcessVersionInfoOriginalFileName: procdump, ProcessCommandLine: 'procdump64.exe -ma w3wp.exe D:\dumps\w3wp.dmp', InitiatingProcessFileName: cmd.exe}
+    - {ago: 10m, DeviceName: it-ws-01, AccountName: alice, FileName: rundll32.exe, ProcessCommandLine: 'rundll32.exe shell32.dll,Control_RunDLL desk.cpl', InitiatingProcessFileName: explorer.exe}
+expect:
+  rows: 2
+  include:
+    - {DeviceName: fin-ws-07}
+    - {DeviceName: srv-app-02}
+  exclude:
+    - {DeviceName: srv-web-01}
+    - {DeviceName: it-ws-01}

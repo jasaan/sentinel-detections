@@ -1,0 +1,40 @@
+id: c48f593e-70bf-4036-9b7d-596a0814e9ac
+name: Active Directory database (NTDS.dit) extraction
+description: |
+  NTDS.dit holds the password hash of every account in the domain. Attackers copy it from a domain controller with
+  ntdsutil "ifm", or from a volume shadow copy, then crack or pass the hashes offline. Finding this means the whole
+  domain's credentials should be treated as stolen.
+  Seen in: Volt Typhoon, and ransomware intrusions documented by CISA and The DFIR Report.
+  Tuning: AD backup products don't use these commands; expect close to zero legitimate hits.
+  Triage: confirm on the DC, find where the copy went, and start a domain-wide credential reset plan (krbtgt twice,
+  privileged accounts, service accounts).
+severity: High
+requiredDataConnectors:
+  - connectorId: MicrosoftThreatProtection
+    dataTypes:
+      - DeviceProcessEvents
+queryFrequency: 1h
+queryPeriod: 1h
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - CredentialAccess
+relevantTechniques:
+  - T1003.003
+query: |
+  DeviceProcessEvents
+  | where TimeGenerated > ago(1h)
+  | where (FileName =~ "ntdsutil.exe" and ProcessCommandLine matches regex @"(?i)\bifm\b")
+      or ProcessCommandLine matches regex @"(?i)\\ntds\.dit"
+  | project TimeGenerated, DeviceName, AccountName, FileName, ProcessCommandLine, InitiatingProcessFileName, InitiatingProcessCommandLine
+entityMappings:
+  - entityType: Host
+    fieldMappings:
+      - identifier: HostName
+        columnName: DeviceName
+  - entityType: Account
+    fieldMappings:
+      - identifier: Name
+        columnName: AccountName
+version: 1.0.0
+kind: Scheduled

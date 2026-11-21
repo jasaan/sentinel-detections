@@ -1,0 +1,48 @@
+id: e548d751-6880-4ff0-b128-9b18b0e888fd
+name: Account suddenly emails far more recipients than usual
+description: |
+  A compromised mailbox is often used straight away to phish colleagues, customers and suppliers, because mail from a
+  real account passes every reputation check. This rule flags a sender who reached 100+ recipients in the last hour and
+  more than three times their busiest hour in the previous two weeks.
+  Tuning: marketing and communications senders have high baselines and won't fire unless they spike further; brand-new
+  mailboxes have no baseline and will fire if they hit the threshold.
+  Triage: read a sample of the messages (subject, links). If it's phishing, block the sender, revoke sessions, reset
+  the password and purge the messages; then warn external recipients.
+severity: Medium
+requiredDataConnectors:
+  - connectorId: MicrosoftThreatProtection
+    dataTypes:
+      - EmailEvents
+queryFrequency: 1h
+queryPeriod: 14d
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - LateralMovement
+  - InitialAccess
+relevantTechniques:
+  - T1534
+  - T1566.002
+query: |
+  let minRecipients = 100;
+  let Baseline = EmailEvents
+      | where TimeGenerated between (ago(14d) .. ago(1h))
+      | where EmailDirection in~ ("Outbound", "Intra-org")
+      | summarize Recipients = dcount(RecipientEmailAddress) by Sender = tolower(SenderFromAddress), Hour = bin(TimeGenerated, 1h)
+      | summarize BaselineMaxPerHour = max(Recipients) by Sender;
+  EmailEvents
+  | where TimeGenerated > ago(1h)
+  | where EmailDirection in~ ("Outbound", "Intra-org")
+  | summarize Recipients = dcount(RecipientEmailAddress), Messages = count(), WithUrls = countif(UrlCount > 0),
+      Subjects = make_set(Subject, 5) by Sender = tolower(SenderFromAddress)
+  | join kind=leftouter Baseline on Sender
+  | extend BaselineMaxPerHour = iff(isnull(BaselineMaxPerHour), 0, BaselineMaxPerHour)
+  | where Recipients >= minRecipients and Recipients > 3 * BaselineMaxPerHour
+  | project Sender, Recipients, Messages, WithUrls, BaselineMaxPerHour, Subjects
+entityMappings:
+  - entityType: Account
+    fieldMappings:
+      - identifier: FullName
+        columnName: Sender
+version: 1.0.0
+kind: Scheduled

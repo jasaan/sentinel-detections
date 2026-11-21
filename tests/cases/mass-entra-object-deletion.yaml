@@ -1,0 +1,12 @@
+rule: detections/mass-entra-object-deletion.yaml
+description: Twelve user deletions by one admin fire; three by another admin don't.
+data:
+  AuditLogs:
+    - {ago: 30m, _repeat: 12, _step: 20s, OperationName: Delete user, Result: success, Category: UserManagement, InitiatedBy: {user: {userPrincipalName: rogue@contoso.com}}, TargetResources: [{userPrincipalName: "user{i}@contoso.com"}]}
+    - {ago: 30m, _repeat: 3, _step: 20s, OperationName: Delete user, Result: success, Category: UserManagement, InitiatedBy: {user: {userPrincipalName: hr-admin@contoso.com}}, TargetResources: [{userPrincipalName: "leaver{i}@contoso.com"}]}
+expect:
+  rows: 1
+  include:
+    - {Actor: rogue@contoso.com, Deletions: 12}
+  exclude:
+    - {Actor: hr-admin@contoso.com}

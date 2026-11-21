@@ -1,0 +1,46 @@
+id: 0d326f5f-9caf-453c-ba35-f1818c3378c8
+name: Office application launches a shell, script host or LOLBin
+description: |
+  Word, Excel, PowerPoint, Outlook or OneNote starting PowerShell, cmd, mshta, rundll32 or similar is the classic sign of
+  a malicious document or attachment running its first stage.
+  Seen in: Emotet, Qakbot, IcedID and countless phishing loaders; blocked by the ASR rule "Block all Office applications
+  from creating child processes".
+  Tuning: some Excel add-ins and mail-merge tools start cmd.exe; check the command line and allow-list the specific
+  add-in path if needed. Turning on the ASR rule in block mode is the real fix.
+  Triage: get the document (from the email or the device), check what the child process did next (network connections,
+  dropped files), and isolate the device if anything ran.
+severity: High
+requiredDataConnectors:
+  - connectorId: MicrosoftThreatProtection
+    dataTypes:
+      - DeviceProcessEvents
+queryFrequency: 1h
+queryPeriod: 1h
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - Execution
+  - InitialAccess
+relevantTechniques:
+  - T1204.002
+  - T1566.001
+query: |
+  let OfficeApps = dynamic(["winword.exe", "excel.exe", "powerpnt.exe", "outlook.exe", "onenote.exe", "msaccess.exe", "mspub.exe", "visio.exe"]);
+  let SuspiciousChildren = dynamic(["powershell.exe", "pwsh.exe", "cmd.exe", "wscript.exe", "cscript.exe", "mshta.exe", "rundll32.exe",
+      "regsvr32.exe", "certutil.exe", "bitsadmin.exe", "msbuild.exe", "schtasks.exe", "wmic.exe", "curl.exe", "installutil.exe",
+      "regasm.exe", "regsvcs.exe", "forfiles.exe", "hh.exe"]);
+  DeviceProcessEvents
+  | where TimeGenerated > ago(1h)
+  | where InitiatingProcessFileName in~ (OfficeApps) and FileName in~ (SuspiciousChildren)
+  | project TimeGenerated, DeviceName, AccountName, FileName, ProcessCommandLine, InitiatingProcessFileName, InitiatingProcessCommandLine
+entityMappings:
+  - entityType: Host
+    fieldMappings:
+      - identifier: HostName
+        columnName: DeviceName
+  - entityType: Account
+    fieldMappings:
+      - identifier: Name
+        columnName: AccountName
+version: 1.0.0
+kind: Scheduled

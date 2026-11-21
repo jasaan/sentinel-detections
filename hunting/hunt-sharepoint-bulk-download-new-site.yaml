@@ -1,0 +1,31 @@
+id: 7ea74376-f66b-4888-ac8b-d8fcf0db4fa2
+name: Bulk download from a SharePoint site the user hasn't used before
+description: |
+  People mostly work in the same handful of sites. Downloading 25+ files from a site the user hasn't touched in 30 days
+  is how both departing employees and attackers with a stolen session collect data, and it stays under the tenant-wide
+  mass-download threshold.
+  How to hunt: check whether the site matches the user's job (HR files pulled by an engineer is the classic case), and
+  whether the downloads came from a managed device or an unfamiliar IP.
+requiredDataConnectors:
+  - connectorId: Office365
+    dataTypes:
+      - OfficeActivity
+tactics:
+  - Collection
+  - Exfiltration
+relevantTechniques:
+  - T1213.002
+  - T1530
+query: |
+  let Known = OfficeActivity
+      | where TimeGenerated between (ago(30d) .. ago(1d))
+      | where OfficeWorkload in ("SharePoint", "OneDrive")
+      | distinct UserId, Site_Url;
+  OfficeActivity
+  | where TimeGenerated > ago(1d)
+  | where OfficeWorkload in ("SharePoint", "OneDrive") and Operation in ("FileDownloaded", "FileSyncDownloadedFull")
+  | join kind=leftanti Known on UserId, Site_Url
+  | summarize Files = dcount(SourceFileName), SampleFiles = make_set(SourceFileName, 10), ClientIPs = make_set(ClientIP, 5),
+      FirstSeen = min(TimeGenerated) by UserId, Site_Url
+  | where Files >= 25
+  | order by Files desc

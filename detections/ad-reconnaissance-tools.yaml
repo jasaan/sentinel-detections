@@ -1,0 +1,54 @@
+id: 08a84058-9e73-4ea3-8e52-1e4e18ecf5bb
+name: Active Directory reconnaissance (AdFind, SharpHound or several discovery commands)
+description: |
+  Before moving laterally, attackers map the domain: trusts, domain controllers, Domain Admins members, and attack
+  paths. AdFind and SharpHound (BloodHound's collector) fire on their own; built-in commands like nltest and net group
+  fire when one account runs three or more different kinds within the hour on a device.
+  Seen in: Conti, BlackCat, Black Basta, Qakbot and Scattered Spider (AdFind and SharpHound feature in many DFIR Report
+  cases).
+  Tuning: IT staff run single commands like "net user bob /domain" all day; the three-technique threshold is there for
+  that reason. Exclude your own BloodHound assessments by device.
+  Triage: check the account and the parent process. Recon from a user's workstation by a non-IT account, or from a
+  service account, usually means the device is compromised.
+severity: Medium
+requiredDataConnectors:
+  - connectorId: MicrosoftThreatProtection
+    dataTypes:
+      - DeviceProcessEvents
+queryFrequency: 1h
+queryPeriod: 1h
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - Discovery
+relevantTechniques:
+  - T1087.002
+  - T1069.002
+  - T1482
+query: |
+  DeviceProcessEvents
+  | where TimeGenerated > ago(1h)
+  | extend Recon = case(
+      FileName =~ "adfind.exe" or ProcessVersionInfoOriginalFileName =~ "adfind.exe", "AdFind",
+      ProcessCommandLine matches regex @"(?i)sharphound|invoke-bloodhound|--collectionmethods?\s", "SharpHound",
+      FileName =~ "nltest.exe" and ProcessCommandLine matches regex @"(?i)/(domain_trusts|dclist|all_trusts|dsgetdc)", "nltest trusts or DCs",
+      FileName in~ ("net.exe", "net1.exe") and ProcessCommandLine matches regex @"(?i)group\s+""?(domain admins|enterprise admins|schema admins)", "net group admins",
+      FileName in~ ("net.exe", "net1.exe") and ProcessCommandLine matches regex @"(?i)\b(user|group|accounts)\b.*\s/do(m|main)?\b", "net domain query",
+      FileName =~ "dsquery.exe", "dsquery",
+      ProcessCommandLine matches regex @"(?i)get-ad(user|computer|group|domaintrust|trust)\b.*-filter\s+\*", "Get-AD* -Filter *",
+      "")
+  | where isnotempty(Recon)
+  | summarize Techniques = make_set(Recon), Commands = make_set(ProcessCommandLine, 10), FirstSeen = min(TimeGenerated),
+      LastSeen = max(TimeGenerated) by DeviceName, AccountName
+  | where set_has_element(Techniques, "AdFind") or set_has_element(Techniques, "SharpHound") or array_length(Techniques) >= 3
+entityMappings:
+  - entityType: Host
+    fieldMappings:
+      - identifier: HostName
+        columnName: DeviceName
+  - entityType: Account
+    fieldMappings:
+      - identifier: Name
+        columnName: AccountName
+version: 1.0.0
+kind: Scheduled

@@ -1,0 +1,14 @@
+rule: hunting/hunt-rare-binary-user-writable-path.yaml
+description: A one-device binary in Downloads shows up; a widely deployed AppData updater and a System32 binary don't.
+data:
+  DeviceProcessEvents:
+    - {ago: 3h, DeviceName: fin-ws-07, AccountName: carol, FileName: invoice_viewer.exe, FolderPath: 'C:\Users\carol\Downloads\invoice_viewer.exe', SHA256: bbbb000000000000000000000000000000000000000000000000000000000001, InitiatingProcessFileName: explorer.exe}
+    - {ago: 3h, _repeat: 5, DeviceName: "ws-{i}", AccountName: "user{i}", FileName: Update.exe, FolderPath: 'C:\Users\u\AppData\Local\Vendor\Update.exe', SHA256: bbbb000000000000000000000000000000000000000000000000000000000002, InitiatingProcessFileName: svchost.exe}
+    - {ago: 3h, DeviceName: it-ws-01, AccountName: alice, FileName: rare.exe, FolderPath: 'C:\Windows\System32\rare.exe', SHA256: bbbb000000000000000000000000000000000000000000000000000000000003, InitiatingProcessFileName: services.exe}
+expect:
+  rows: 1
+  include:
+    - {FileName: invoice_viewer.exe, DeviceCount: 1}
+  exclude:
+    - {FileName: Update.exe}
+    - {FileName: rare.exe}

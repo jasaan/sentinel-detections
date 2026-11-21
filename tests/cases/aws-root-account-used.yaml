@@ -1,0 +1,14 @@
+rule: detections/aws-root-account-used.yaml
+description: A root console login fires; IAM user activity and a service event on root's behalf don't.
+data:
+  AWSCloudTrail:
+    - {ago: 20m, EventName: ConsoleLogin, EventSource: signin.amazonaws.com, EventTypeName: AwsConsoleSignIn, UserIdentityType: Root, UserIdentityArn: "arn:aws:iam::123456789012:root", RecipientAccountId: "123456789012", SourceIpAddress: 198.51.100.120}
+    - {ago: 20m, EventName: ListBuckets, EventSource: s3.amazonaws.com, EventTypeName: AwsApiCall, UserIdentityType: IAMUser, UserIdentityArn: "arn:aws:iam::123456789012:user/alice", UserIdentityUserName: alice, RecipientAccountId: "123456789012", SourceIpAddress: 203.0.113.120}
+    - {ago: 20m, EventName: SharedSnapshotCopyInitiated, EventSource: ec2.amazonaws.com, EventTypeName: AwsServiceEvent, UserIdentityType: Root, RecipientAccountId: "123456789012", SourceIpAddress: ec2.amazonaws.com}
+expect:
+  rows: 1
+  include:
+    - {SourceIpAddress: 198.51.100.120}
+  exclude:
+    - {SourceIpAddress: 203.0.113.120}
+    - {SourceIpAddress: ec2.amazonaws.com}

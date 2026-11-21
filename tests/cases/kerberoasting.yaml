@@ -1,0 +1,14 @@
+rule: detections/kerberoasting.yaml
+description: Eight RC4 tickets for different SPNs fire; eight AES tickets and RC4 tickets for computer accounts don't.
+data:
+  SecurityEvent:
+    - {ago: 20m, _repeat: 8, _step: 2s, EventID: 4769, Computer: dc01.contoso.local, TargetUserName: carol@CONTOSO.LOCAL, ServiceName: "svc-app{i}", TicketEncryptionType: "0x17", IpAddress: "::ffff:10.0.5.27"}
+    - {ago: 20m, _repeat: 8, _step: 2s, EventID: 4769, Computer: dc01.contoso.local, TargetUserName: alice@CONTOSO.LOCAL, ServiceName: "svc-app{i}", TicketEncryptionType: "0x12", IpAddress: "::ffff:10.0.5.28"}
+    - {ago: 20m, _repeat: 8, _step: 2s, EventID: 4769, Computer: dc01.contoso.local, TargetUserName: bob@CONTOSO.LOCAL, ServiceName: "WS{i}$", TicketEncryptionType: "0x17", IpAddress: "::ffff:10.0.5.29"}
+expect:
+  rows: 1
+  include:
+    - {TargetUserName: carol@CONTOSO.LOCAL, Services: 8}
+  exclude:
+    - {TargetUserName: alice@CONTOSO.LOCAL}
+    - {TargetUserName: bob@CONTOSO.LOCAL}

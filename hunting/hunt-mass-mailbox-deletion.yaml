@@ -1,0 +1,28 @@
+id: c8b393e9-e91e-4dae-a7fb-9984fc7cd9fa
+name: Large numbers of mail items deleted from a mailbox
+description: |
+  Bulk deletion of mail can be an attacker covering tracks (deleting sent phishing, security notifications or replies
+  from a fraud victim), an insider destroying records, or someone tidying their inbox. Hard deletes (bypassing Deleted
+  Items) are the more interesting signal.
+  How to hunt: look at rows where the actor isn't the mailbox owner, or where the client IP is unfamiliar. Pair with
+  the inbox-rule rules and with sign-ins for the same user around the same time.
+requiredDataConnectors:
+  - connectorId: Office365
+    dataTypes:
+      - OfficeActivity
+tactics:
+  - DefenseEvasion
+  - Impact
+relevantTechniques:
+  - T1070.008
+  - T1485
+query: |
+  OfficeActivity
+  | where TimeGenerated > ago(1d)
+  | where OfficeWorkload == "Exchange" and Operation in ("HardDelete", "SoftDelete", "MoveToDeletedItems")
+  | summarize HardDeletes = countif(Operation == "HardDelete"), SoftDeletes = countif(Operation == "SoftDelete"),
+      MovedToDeleted = countif(Operation == "MoveToDeletedItems"), ClientIPs = make_set(ClientIP, 10),
+      FirstSeen = min(TimeGenerated), LastSeen = max(TimeGenerated) by Actor = UserId, MailboxOwnerUPN
+  | where HardDeletes >= 50 or (HardDeletes + SoftDeletes + MovedToDeleted) >= 500
+  | extend ActorIsOwner = tolower(Actor) == tolower(MailboxOwnerUPN)
+  | order by HardDeletes desc

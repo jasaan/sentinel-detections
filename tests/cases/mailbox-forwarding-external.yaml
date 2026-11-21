@@ -1,0 +1,14 @@
+rule: detections/mailbox-forwarding-external.yaml
+description: Forwarding a mailbox to a Gmail-style external address fires; forwarding to a colleague and an unrelated Set-Mailbox don't.
+data:
+  OfficeActivity:
+    - {ago: 15m, Operation: Set-Mailbox, OfficeWorkload: Exchange, UserId: alice@contoso.com, ClientIP: 198.51.100.24, Parameters: '[{"Name":"Identity","Value":"alice@contoso.com"},{"Name":"ForwardingSmtpAddress","Value":"smtp:alice.backup@mail.example.net"},{"Name":"DeliverToMailboxAndForward","Value":"True"}]'}
+    - {ago: 15m, Operation: Set-Mailbox, OfficeWorkload: Exchange, UserId: admin1@contoso.com, ClientIP: 203.0.113.24, Parameters: '[{"Name":"Identity","Value":"leaver@contoso.com"},{"Name":"ForwardingSmtpAddress","Value":"smtp:manager@contoso.com"}]'}
+    - {ago: 15m, Operation: Set-Mailbox, OfficeWorkload: Exchange, UserId: admin2@contoso.com, ClientIP: 203.0.113.25, Parameters: '[{"Name":"Identity","Value":"bob@contoso.com"},{"Name":"ProhibitSendQuota","Value":"49GB"}]'}
+expect:
+  rows: 1
+  include:
+    - {Mailbox: alice@contoso.com, ForwardDomain: mail.example.net}
+  exclude:
+    - {Actor: admin1@contoso.com}
+    - {Actor: admin2@contoso.com}

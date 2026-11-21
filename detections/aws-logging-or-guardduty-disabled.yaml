@@ -1,0 +1,44 @@
+id: a93e2d80-674c-4264-b7cc-8aac1dd71a0b
+name: AWS CloudTrail, GuardDuty, Config or flow logs disabled
+description: |
+  Stopping or deleting a trail, turning off GuardDuty, or removing Config recorders and VPC flow logs removes the
+  evidence and the alerts for whatever comes next. It's one of the first things attackers do with stolen admin keys.
+  Seen in: most documented AWS intrusions (for example the cryptomining and data-theft campaigns reported by AWS and
+  Datadog); a standard step in Stratus Red Team and Pacu.
+  Tuning: UpdateTrail and PutEventSelectors are also used for routine changes; review the request parameters before
+  closing. Use an SCP to deny these calls outside a break-glass role.
+  Triage: turn the service back on, find out how the caller got its credentials, and check what it did right after.
+severity: High
+requiredDataConnectors:
+  - connectorId: AWS
+    dataTypes:
+      - AWSCloudTrail
+queryFrequency: 1h
+queryPeriod: 1h
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - DefenseEvasion
+relevantTechniques:
+  - T1562.008
+query: |
+  let TamperEvents = dynamic(["StopLogging", "DeleteTrail", "UpdateTrail", "PutEventSelectors", "DeleteDetector",
+      "DisassociateFromAdministratorAccount", "DisassociateFromMasterAccount", "StopMonitoringMembers", "DeleteMembers",
+      "DeleteFlowLogs", "DeleteConfigurationRecorder", "StopConfigurationRecorder", "DeleteDeliveryChannel", "DisableSecurityHub"]);
+  AWSCloudTrail
+  | where TimeGenerated > ago(1h)
+  | where isempty(ErrorCode)
+  | where EventName in (TamperEvents) or (EventName == "UpdateDetector" and RequestParameters contains '"enable":false')
+  | summarize FirstSeen = min(TimeGenerated), EventNames = make_set(EventName), Regions = make_set(AWSRegion), Requests = make_set(RequestParameters, 5)
+      by UserIdentityArn, SourceIpAddress, RecipientAccountId
+entityMappings:
+  - entityType: Account
+    fieldMappings:
+      - identifier: Name
+        columnName: UserIdentityArn
+  - entityType: IP
+    fieldMappings:
+      - identifier: Address
+        columnName: SourceIpAddress
+version: 1.0.0
+kind: Scheduled

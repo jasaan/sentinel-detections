@@ -1,0 +1,29 @@
+id: 5ddaf768-e0c3-4f02-8980-570fa916a977
+name: Storage account keys listed by a new caller
+description: |
+  A storage account key gives full access to every blob, file share, queue and table in the account, and it isn't tied
+  to the caller's identity, so later data access doesn't show who did it. Listing keys is noisy (the portal does it),
+  so this is a hunt: callers who listed keys today and hadn't in the previous 14 days.
+  How to hunt: callers listing keys on many accounts at once rank first. Check whether the account then showed reads
+  from unfamiliar IPs (StorageBlobLogs, if collected), and consider disabling shared key access entirely.
+requiredDataConnectors:
+  - connectorId: AzureActivity
+    dataTypes:
+      - AzureActivity
+tactics:
+  - CredentialAccess
+relevantTechniques:
+  - T1552.001
+  - T1098.001
+query: |
+  let Known = AzureActivity
+      | where TimeGenerated between (ago(14d) .. ago(1d))
+      | where OperationNameValue =~ "MICROSOFT.STORAGE/STORAGEACCOUNTS/LISTKEYS/ACTION"
+      | distinct Caller;
+  AzureActivity
+  | where TimeGenerated > ago(1d)
+  | where OperationNameValue =~ "MICROSOFT.STORAGE/STORAGEACCOUNTS/LISTKEYS/ACTION" and ActivityStatusValue in~ ("Success", "Succeeded")
+  | where Caller !in (Known)
+  | summarize StorageAccountCount = dcount(_ResourceId), StorageAccounts = make_set(_ResourceId, 20), IPs = make_set(CallerIpAddress, 10),
+      FirstSeen = min(TimeGenerated) by Caller
+  | order by StorageAccountCount desc

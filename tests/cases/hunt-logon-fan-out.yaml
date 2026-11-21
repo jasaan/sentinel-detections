@@ -1,0 +1,14 @@
+rule: hunting/hunt-logon-fan-out.yaml
+description: An account logging on to twelve servers shows up; a user on two machines and a computer account on twenty don't.
+data:
+  DeviceLogonEvents:
+    - {ago: 3h, _repeat: 12, _step: 20s, DeviceName: "srv-{i}", ActionType: LogonSuccess, LogonType: Network, AccountName: svc-backup, AccountDomain: CONTOSO, RemoteIP: 10.0.5.27, RemoteIPType: Private}
+    - {ago: 3h, _repeat: 2, _step: 20s, DeviceName: "ws-{i}", ActionType: LogonSuccess, LogonType: RemoteInteractive, AccountName: alice, AccountDomain: CONTOSO, RemoteIP: 10.0.5.28, RemoteIPType: Private}
+    - {ago: 3h, _repeat: 20, _step: 20s, DeviceName: "host-{i}", ActionType: LogonSuccess, LogonType: Network, AccountName: MGMT01$, AccountDomain: CONTOSO, RemoteIP: 10.0.5.29, RemoteIPType: Private}
+expect:
+  rows: 1
+  include:
+    - {AccountName: svc-backup, DeviceCount: 12}
+  exclude:
+    - {AccountName: alice}
+    - {AccountName: MGMT01$}

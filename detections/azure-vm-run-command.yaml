@@ -1,0 +1,48 @@
+id: a2a402ae-4d52-4b57-a544-4e4c5e50c141
+name: VM Run Command used by an account that hasn't used it before
+description: |
+  Run Command executes scripts as SYSTEM or root on any VM the caller can manage, with no network access to the VM
+  needed. Attackers with Azure Contributor rights use it to push ransomware or tooling to servers. This rule flags
+  callers with no Run Command activity in the previous 14 days.
+  Seen in: Storm-0501, Octo Tempest, and red-team guidance on Azure lateral movement.
+  Tuning: break-glass and automation identities may use it rarely; once confirmed, they won't fire again for 14 days.
+  Triage: get the script content (the Run Command history on the VM, or Get-AzVMRunCommand), check who ran it and from
+  where, and look at the VM for new processes or files right after.
+severity: Medium
+requiredDataConnectors:
+  - connectorId: AzureActivity
+    dataTypes:
+      - AzureActivity
+queryFrequency: 1h
+queryPeriod: 14d
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - Execution
+  - LateralMovement
+relevantTechniques:
+  - T1651
+query: |
+  let RunCommandOps = dynamic(["MICROSOFT.COMPUTE/VIRTUALMACHINES/RUNCOMMAND/ACTION", "MICROSOFT.COMPUTE/VIRTUALMACHINES/RUNCOMMANDS/WRITE",
+      "MICROSOFT.COMPUTE/VIRTUALMACHINESCALESETS/VIRTUALMACHINES/RUNCOMMAND/ACTION", "MICROSOFT.HYBRIDCOMPUTE/MACHINES/RUNCOMMANDS/WRITE"]);
+  let KnownCallers = AzureActivity
+      | where TimeGenerated between (ago(14d) .. ago(1h))
+      | where OperationNameValue in~ (RunCommandOps)
+      | distinct Caller;
+  AzureActivity
+  | where TimeGenerated > ago(1h)
+  | where OperationNameValue in~ (RunCommandOps) and ActivityStatusValue !in~ ("Failure", "Failed")
+  | where Caller !in (KnownCallers)
+  | summarize FirstSeen = min(TimeGenerated), VMs = make_set(_ResourceId, 20), VMCount = dcount(_ResourceId)
+      by Caller, CallerIpAddress, SubscriptionId
+entityMappings:
+  - entityType: Account
+    fieldMappings:
+      - identifier: FullName
+        columnName: Caller
+  - entityType: IP
+    fieldMappings:
+      - identifier: Address
+        columnName: CallerIpAddress
+version: 1.0.0
+kind: Scheduled

@@ -1,0 +1,39 @@
+id: 84190a4a-935a-4239-95da-9714d0d0c85b
+name: Conditional Access named location added, changed or deleted
+description: |
+  Named locations feed Conditional Access. Marking an attacker-controlled IP range as trusted can skip MFA or
+  location blocks without touching any policy, so the existing CA-policy rule never fires.
+  Tuning: network teams update named locations when offices or VPN egress change; tie each change to a ticket.
+  The IsTrusted column shows whether the new definition marks the range as trusted.
+  Triage: check the IP ranges in NewValue against your known office, VPN and cloud egress ranges.
+severity: Medium
+requiredDataConnectors:
+  - connectorId: AzureActiveDirectory
+    dataTypes:
+      - AuditLogs
+queryFrequency: 1h
+queryPeriod: 1h
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - DefenseEvasion
+  - Persistence
+relevantTechniques:
+  - T1556.009
+query: |
+  AuditLogs
+  | where TimeGenerated > ago(1h)
+  | where OperationName in ("Add named location", "Update named location", "Delete named location") and Result =~ "success"
+  | extend Location = tostring(TargetResources[0].displayName),
+      NewValue = tostring(TargetResources[0].modifiedProperties[0].newValue),
+      Actor = coalesce(tostring(InitiatedBy.user.userPrincipalName), tostring(InitiatedBy.app.displayName)),
+      ActorIP = tostring(InitiatedBy.user.ipAddress)
+  | extend IsTrusted = NewValue contains '"isTrusted":true'
+  | project TimeGenerated, OperationName, Location, IsTrusted, NewValue, Actor, ActorIP
+entityMappings:
+  - entityType: Account
+    fieldMappings:
+      - identifier: FullName
+        columnName: Actor
+version: 1.0.0
+kind: Scheduled

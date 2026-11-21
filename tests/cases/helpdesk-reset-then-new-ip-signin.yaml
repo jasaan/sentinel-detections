@@ -1,0 +1,20 @@
+rule: detections/helpdesk-reset-then-new-ip-signin.yaml
+description: A reset followed by a sign-in from a new IP fires; a reset followed by a known-IP sign-in, and a new IP with no reset, don't.
+data:
+  AuditLogs:
+    - {ago: 100m, OperationName: Reset password (by admin), Result: success, Category: UserManagement, InitiatedBy: {user: {userPrincipalName: helpdesk1@contoso.com}}, TargetResources: [{userPrincipalName: alice@contoso.com}]}
+    - {ago: 95m, OperationName: Admin registered security info, Result: success, Category: UserManagement, InitiatedBy: {user: {userPrincipalName: helpdesk1@contoso.com}}, TargetResources: [{userPrincipalName: alice@contoso.com}]}
+    - {ago: 100m, OperationName: Reset password (by admin), Result: success, Category: UserManagement, InitiatedBy: {user: {userPrincipalName: helpdesk2@contoso.com}}, TargetResources: [{userPrincipalName: bob@contoso.com}]}
+  SigninLogs:
+    - {ago: 5d, UserPrincipalName: alice@contoso.com, ResultType: "0", IPAddress: 203.0.113.20, Location: US}
+    - {ago: 60m, UserPrincipalName: alice@contoso.com, ResultType: "0", IPAddress: 198.51.100.77, Location: US}
+    - {ago: 4d, UserPrincipalName: bob@contoso.com, ResultType: "0", IPAddress: 203.0.113.21, Location: US}
+    - {ago: 60m, UserPrincipalName: bob@contoso.com, ResultType: "0", IPAddress: 203.0.113.21, Location: US}
+    - {ago: 60m, UserPrincipalName: carol@contoso.com, ResultType: "0", IPAddress: 198.51.100.78, Location: US}
+expect:
+  rows: 1
+  include:
+    - {UserPrincipalName: alice@contoso.com, Admin: helpdesk1@contoso.com}
+  exclude:
+    - {UserPrincipalName: bob@contoso.com}
+    - {UserPrincipalName: carol@contoso.com}

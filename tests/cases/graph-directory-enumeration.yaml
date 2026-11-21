@@ -1,0 +1,18 @@
+rule: detections/graph-directory-enumeration.yaml
+description: A user pulling seven kinds of directory object 140 times fires; an app reading only users 300 times doesn't.
+data:
+  MicrosoftGraphActivityLogs:
+    - {ago: 30m, _repeat: 20, _step: 2s, UserId: u-mallory, AppId: 1b730954-1685-4b74-9bfd-dac224a7b894, RequestUri: "https://graph.microsoft.com/v1.0/users?$top=999&page={i}", RequestMethod: GET, ResponseStatusCode: 200, IPAddress: 198.51.100.70, UserAgent: python-requests/2.31}
+    - {ago: 29m, _repeat: 20, _step: 2s, UserId: u-mallory, RequestUri: "https://graph.microsoft.com/v1.0/groups?page={i}", RequestMethod: GET, ResponseStatusCode: 200, IPAddress: 198.51.100.70, UserAgent: python-requests/2.31}
+    - {ago: 28m, _repeat: 20, _step: 2s, UserId: u-mallory, RequestUri: "https://graph.microsoft.com/beta/servicePrincipals?page={i}", RequestMethod: GET, ResponseStatusCode: 200, IPAddress: 198.51.100.70, UserAgent: python-requests/2.31}
+    - {ago: 27m, _repeat: 20, _step: 2s, UserId: u-mallory, RequestUri: "https://graph.microsoft.com/v1.0/applications?page={i}", RequestMethod: GET, ResponseStatusCode: 200, IPAddress: 198.51.100.70, UserAgent: python-requests/2.31}
+    - {ago: 26m, _repeat: 20, _step: 2s, UserId: u-mallory, RequestUri: "https://graph.microsoft.com/v1.0/directoryRoles/{i}/members", RequestMethod: GET, ResponseStatusCode: 200, IPAddress: 198.51.100.70, UserAgent: python-requests/2.31}
+    - {ago: 25m, _repeat: 20, _step: 2s, UserId: u-mallory, RequestUri: "https://graph.microsoft.com/v1.0/devices?page={i}", RequestMethod: GET, ResponseStatusCode: 200, IPAddress: 198.51.100.70, UserAgent: python-requests/2.31}
+    - {ago: 24m, _repeat: 20, _step: 2s, UserId: u-mallory, RequestUri: "https://graph.microsoft.com/beta/policies/conditionalAccessPolicies?page={i}", RequestMethod: GET, ResponseStatusCode: 200, IPAddress: 198.51.100.70, UserAgent: python-requests/2.31}
+    - {ago: 30m, _repeat: 300, _step: 5s, ServicePrincipalId: sp-hr, AppId: app-hr, RequestUri: "https://graph.microsoft.com/v1.0/users/{i}", RequestMethod: GET, ResponseStatusCode: 200, IPAddress: 203.0.113.70, UserAgent: HRSync/1.0}
+expect:
+  rows: 1
+  include:
+    - {Identity: u-mallory, Requests: 140, ResourceTypes: 7}
+  exclude:
+    - {Identity: sp-hr}

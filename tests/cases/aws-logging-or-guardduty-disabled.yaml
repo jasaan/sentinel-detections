@@ -1,0 +1,16 @@
+rule: detections/aws-logging-or-guardduty-disabled.yaml
+description: StopLogging and disabling a GuardDuty detector fire; DescribeTrails and a denied StopLogging don't.
+data:
+  AWSCloudTrail:
+    - {ago: 20m, EventName: StopLogging, EventSource: cloudtrail.amazonaws.com, UserIdentityType: IAMUser, UserIdentityArn: "arn:aws:iam::123456789012:user/mallory", RecipientAccountId: "123456789012", SourceIpAddress: 198.51.100.121, AWSRegion: us-east-1, RequestParameters: '{"name":"org-trail"}'}
+    - {ago: 20m, EventName: UpdateDetector, EventSource: guardduty.amazonaws.com, UserIdentityType: AssumedRole, UserIdentityArn: "arn:aws:sts::123456789012:assumed-role/Admin/eve", RecipientAccountId: "123456789012", SourceIpAddress: 198.51.100.122, AWSRegion: us-east-1, RequestParameters: '{"detectorId":"d1","enable":false}'}
+    - {ago: 20m, EventName: DescribeTrails, EventSource: cloudtrail.amazonaws.com, UserIdentityType: IAMUser, UserIdentityArn: "arn:aws:iam::123456789012:user/alice", RecipientAccountId: "123456789012", SourceIpAddress: 203.0.113.121, AWSRegion: us-east-1}
+    - {ago: 20m, EventName: StopLogging, EventSource: cloudtrail.amazonaws.com, UserIdentityType: IAMUser, UserIdentityArn: "arn:aws:iam::123456789012:user/bob", RecipientAccountId: "123456789012", SourceIpAddress: 203.0.113.122, AWSRegion: us-east-1, ErrorCode: AccessDenied}
+expect:
+  rows: 2
+  include:
+    - {UserIdentityArn: "arn:aws:iam::123456789012:user/mallory"}
+    - {UserIdentityArn: "arn:aws:sts::123456789012:assumed-role/Admin/eve"}
+  exclude:
+    - {UserIdentityArn: "arn:aws:iam::123456789012:user/alice"}
+    - {UserIdentityArn: "arn:aws:iam::123456789012:user/bob"}

@@ -1,0 +1,38 @@
+id: 9b131d8f-fc88-4468-961c-afb1591b4058
+name: High-risk sign-in succeeded with a password only
+description: |
+  Entra ID Protection rated the sign-in high risk (for example an anonymizing IP, a password known to be leaked, or an
+  unfamiliar location with attacker-like properties), yet it succeeded without MFA. Either a risk-based Conditional
+  Access policy is missing or this user is excluded from it.
+  Tuning: requires Entra ID P2. If this fires often, the fix is a sign-in risk policy that requires MFA, not a filter.
+  Triage: confirm the sign-in with the user, check the risk detail in Entra ID Protection, and if unexplained, reset the
+  password and revoke sessions. Then find out why MFA wasn't required.
+severity: High
+requiredDataConnectors:
+  - connectorId: AzureActiveDirectory
+    dataTypes:
+      - SigninLogs
+queryFrequency: 1h
+queryPeriod: 1h
+triggerOperator: gt
+triggerThreshold: 0
+tactics:
+  - InitialAccess
+relevantTechniques:
+  - T1078.004
+query: |
+  SigninLogs
+  | where TimeGenerated > ago(1h)
+  | where ResultType == "0" and RiskLevelDuringSignIn =~ "high" and AuthenticationRequirement =~ "singleFactorAuthentication"
+  | project TimeGenerated, UserPrincipalName, IPAddress, Location, AppDisplayName, ClientAppUsed, UserAgent, ConditionalAccessStatus
+entityMappings:
+  - entityType: Account
+    fieldMappings:
+      - identifier: FullName
+        columnName: UserPrincipalName
+  - entityType: IP
+    fieldMappings:
+      - identifier: Address
+        columnName: IPAddress
+version: 1.0.0
+kind: Scheduled

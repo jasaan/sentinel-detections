@@ -1,0 +1,14 @@
+rule: detections/nsg-management-port-open-to-internet.yaml
+description: Opening 3389 to * fires; opening 443 to the internet and 22 to a single office IP don't.
+data:
+  AzureActivity:
+    - {ago: 20m, OperationNameValue: MICROSOFT.NETWORK/NETWORKSECURITYGROUPS/SECURITYRULES/WRITE, ActivityStatusValue: Start, Caller: alice@contoso.com, CallerIpAddress: 198.51.100.108, SubscriptionId: sub-1, _ResourceId: /subscriptions/sub-1/resourceGroups/prod/providers/Microsoft.Network/networkSecurityGroups/nsg1/securityRules/allow-rdp, Properties_d: {requestbody: '{"name":"allow-rdp","properties":{"access":"Allow","direction":"Inbound","protocol":"Tcp","sourceAddressPrefix":"*","destinationPortRange":"3389","priority":100}}'}}
+    - {ago: 20m, OperationNameValue: MICROSOFT.NETWORK/NETWORKSECURITYGROUPS/SECURITYRULES/WRITE, ActivityStatusValue: Start, Caller: bob@contoso.com, CallerIpAddress: 203.0.113.108, SubscriptionId: sub-1, _ResourceId: /subscriptions/sub-1/resourceGroups/prod/providers/Microsoft.Network/networkSecurityGroups/nsg1/securityRules/allow-https, Properties_d: {requestbody: '{"name":"allow-https","properties":{"access":"Allow","direction":"Inbound","protocol":"Tcp","sourceAddressPrefix":"Internet","destinationPortRange":"443","priority":110}}'}}
+    - {ago: 20m, OperationNameValue: MICROSOFT.NETWORK/NETWORKSECURITYGROUPS/SECURITYRULES/WRITE, ActivityStatusValue: Start, Caller: carol@contoso.com, CallerIpAddress: 203.0.113.109, SubscriptionId: sub-1, _ResourceId: /subscriptions/sub-1/resourceGroups/prod/providers/Microsoft.Network/networkSecurityGroups/nsg1/securityRules/allow-ssh-office, Properties_d: {requestbody: '{"name":"allow-ssh-office","properties":{"access":"Allow","direction":"Inbound","protocol":"Tcp","sourceAddressPrefix":"203.0.113.5/32","destinationPortRange":"22","priority":120}}'}}
+expect:
+  rows: 1
+  include:
+    - {Caller: alice@contoso.com, RuleName: allow-rdp}
+  exclude:
+    - {Caller: bob@contoso.com}
+    - {Caller: carol@contoso.com}

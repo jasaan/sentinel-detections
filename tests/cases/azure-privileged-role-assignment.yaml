@@ -1,0 +1,15 @@
+rule: detections/azure-privileged-role-assignment.yaml
+description: An Owner assignment (start and success events) fires once; a Reader assignment and a failed Owner assignment don't.
+data:
+  AzureActivity:
+    - {ago: 20m, OperationNameValue: MICROSOFT.AUTHORIZATION/ROLEASSIGNMENTS/WRITE, ActivityStatusValue: Start, Caller: mallory@contoso.com, CallerIpAddress: 198.51.100.101, SubscriptionId: sub-1, _ResourceId: /subscriptions/sub-1/providers/Microsoft.Authorization/roleAssignments/ra-1, Properties_d: {requestbody: '{"Properties":{"RoleDefinitionId":"/subscriptions/sub-1/providers/Microsoft.Authorization/roleDefinitions/8e3af657-a8ff-443c-a75c-2fe8c4bcb635","PrincipalId":"11111111-2222-3333-4444-555555555555","PrincipalType":"ServicePrincipal","Scope":"/subscriptions/sub-1"}}'}}
+    - {ago: 20m, OperationNameValue: MICROSOFT.AUTHORIZATION/ROLEASSIGNMENTS/WRITE, ActivityStatusValue: Success, Caller: mallory@contoso.com, CallerIpAddress: 198.51.100.101, SubscriptionId: sub-1, _ResourceId: /subscriptions/sub-1/providers/Microsoft.Authorization/roleAssignments/ra-1, Properties_d: {responseBody: '{"properties":{"roleDefinitionId":"/subscriptions/sub-1/providers/Microsoft.Authorization/roleDefinitions/8e3af657-a8ff-443c-a75c-2fe8c4bcb635","principalId":"11111111-2222-3333-4444-555555555555","principalType":"ServicePrincipal"}}'}}
+    - {ago: 20m, OperationNameValue: MICROSOFT.AUTHORIZATION/ROLEASSIGNMENTS/WRITE, ActivityStatusValue: Success, Caller: bob@contoso.com, CallerIpAddress: 203.0.113.102, SubscriptionId: sub-1, _ResourceId: /subscriptions/sub-1/resourceGroups/app/providers/Microsoft.Authorization/roleAssignments/ra-2, Properties_d: {requestbody: '{"Properties":{"RoleDefinitionId":"/subscriptions/sub-1/providers/Microsoft.Authorization/roleDefinitions/acdd72a7-3385-48ef-bd42-f606fba81ae7","PrincipalId":"22222222-2222-3333-4444-555555555555","PrincipalType":"User"}}'}}
+    - {ago: 20m, OperationNameValue: MICROSOFT.AUTHORIZATION/ROLEASSIGNMENTS/WRITE, ActivityStatusValue: Failure, Caller: carol@contoso.com, CallerIpAddress: 203.0.113.103, SubscriptionId: sub-1, _ResourceId: /subscriptions/sub-1/providers/Microsoft.Authorization/roleAssignments/ra-3, Properties_d: {requestbody: '{"Properties":{"RoleDefinitionId":"/subscriptions/sub-1/providers/Microsoft.Authorization/roleDefinitions/8e3af657-a8ff-443c-a75c-2fe8c4bcb635","PrincipalId":"33333333-2222-3333-4444-555555555555","PrincipalType":"User"}}'}}
+expect:
+  rows: 1
+  include:
+    - {Caller: mallory@contoso.com, RoleName: Owner, PrincipalType: ServicePrincipal, AtSubscriptionOrAbove: true}
+  exclude:
+    - {Caller: bob@contoso.com}
+    - {Caller: carol@contoso.com}

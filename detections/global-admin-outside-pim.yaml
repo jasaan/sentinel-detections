@@ -5,6 +5,8 @@ description: |
   Global Administrator or a similar role bypasses approval and time limits. Attackers do this to keep access.
   Tuning: PIM activations log a different operation ("Add member to role completed (PIM activation)") and are not
   matched. Add any break-glass provisioning account to an allow list only after review.
+  Triage: Confirm the assignment with the actor. If unapproved, remove it, reset the target's credentials and review what the
+  role was used for.
 severity: High
 requiredDataConnectors:
   - connectorId: AzureActiveDirectory

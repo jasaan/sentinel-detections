@@ -1,0 +1,14 @@
+rule: detections/m365-audit-logging-disabled.yaml
+description: Disabling mailbox auditing and adding an audit bypass fire; an unrelated Set-Mailbox doesn't.
+data:
+  OfficeActivity:
+    - {ago: 10m, Operation: Set-Mailbox, OfficeWorkload: Exchange, UserId: admin1@contoso.com, ClientIP: 198.51.100.28, Parameters: '[{"Name":"Identity","Value":"ceo@contoso.com"},{"Name":"AuditEnabled","Value":"False"}]'}
+    - {ago: 10m, Operation: Set-MailboxAuditBypassAssociation, OfficeWorkload: Exchange, UserId: admin1@contoso.com, ClientIP: 198.51.100.28, Parameters: '[{"Name":"Identity","Value":"svc-reader@contoso.com"},{"Name":"AuditBypassEnabled","Value":"True"}]'}
+    - {ago: 10m, Operation: Set-Mailbox, OfficeWorkload: Exchange, UserId: admin2@contoso.com, ClientIP: 203.0.113.28, Parameters: '[{"Name":"Identity","Value":"bob@contoso.com"},{"Name":"ProhibitSendQuota","Value":"49GB"}]'}
+expect:
+  rows: 2
+  include:
+    - {Operation: Set-Mailbox, Target: ceo@contoso.com}
+    - {Operation: Set-MailboxAuditBypassAssociation}
+  exclude:
+    - {Actor: admin2@contoso.com}

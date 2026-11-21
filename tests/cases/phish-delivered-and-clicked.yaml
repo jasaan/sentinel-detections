@@ -1,0 +1,18 @@
+rule: detections/phish-delivered-and-clicked.yaml
+description: A click-through on a delivered phish fires; a blocked click and a click on a clean email don't.
+data:
+  EmailEvents:
+    - {ago: 3h, NetworkMessageId: msg-1, RecipientEmailAddress: alice@contoso.com, SenderFromAddress: docs@share-files.example, SenderFromDomain: share-files.example, Subject: Shared document, EmailDirection: Inbound, ThreatTypes: Phish, DeliveryAction: Delivered, DeliveryLocation: Inbox/folder, UrlCount: 1, AttachmentCount: 0}
+    - {ago: 3h, NetworkMessageId: msg-2, RecipientEmailAddress: bob@contoso.com, SenderFromAddress: docs@share-files.example, SenderFromDomain: share-files.example, Subject: Shared document, EmailDirection: Inbound, ThreatTypes: Phish, DeliveryAction: Delivered, DeliveryLocation: Inbox/folder, UrlCount: 1, AttachmentCount: 0}
+    - {ago: 3h, NetworkMessageId: msg-3, RecipientEmailAddress: carol@contoso.com, SenderFromAddress: news@vendor.example, SenderFromDomain: vendor.example, Subject: Newsletter, EmailDirection: Inbound, ThreatTypes: "", DeliveryAction: Delivered, DeliveryLocation: Inbox/folder, UrlCount: 3, AttachmentCount: 0}
+  UrlClickEvents:
+    - {ago: 20m, NetworkMessageId: msg-1, AccountUpn: Alice@contoso.com, Url: "https://share-files.example/login", ActionType: ClickAllowed, IsClickedThrough: false, IPAddress: 203.0.113.35, Workload: Email}
+    - {ago: 20m, NetworkMessageId: msg-2, AccountUpn: bob@contoso.com, Url: "https://share-files.example/login", ActionType: ClickBlocked, IsClickedThrough: false, IPAddress: 203.0.113.36, Workload: Email}
+    - {ago: 20m, NetworkMessageId: msg-3, AccountUpn: carol@contoso.com, Url: "https://vendor.example/news", ActionType: ClickAllowed, IsClickedThrough: false, IPAddress: 203.0.113.37, Workload: Email}
+expect:
+  rows: 1
+  include:
+    - {AccountUpn: alice@contoso.com, NetworkMessageId: msg-1}
+  exclude:
+    - {AccountUpn: bob@contoso.com}
+    - {AccountUpn: carol@contoso.com}

@@ -1,0 +1,13 @@
+rule: hunting/hunt-storage-account-key-listing.yaml
+description: A new caller listing keys on three accounts shows up; a pipeline that lists keys every week doesn't.
+data:
+  AzureActivity:
+    - {ago: 3h, _repeat: 3, _step: 30s, OperationNameValue: MICROSOFT.STORAGE/STORAGEACCOUNTS/LISTKEYS/ACTION, ActivityStatusValue: Success, Caller: mallory@contoso.com, CallerIpAddress: 198.51.100.165, _ResourceId: "/subscriptions/sub-1/resourceGroups/data/providers/Microsoft.Storage/storageAccounts/sa{i}"}
+    - {ago: 5d, OperationNameValue: MICROSOFT.STORAGE/STORAGEACCOUNTS/LISTKEYS/ACTION, ActivityStatusValue: Success, Caller: 9f8e7d6c-pipeline-sp, CallerIpAddress: 203.0.113.165, _ResourceId: /subscriptions/sub-1/resourceGroups/app/providers/Microsoft.Storage/storageAccounts/appsa}
+    - {ago: 3h, OperationNameValue: MICROSOFT.STORAGE/STORAGEACCOUNTS/LISTKEYS/ACTION, ActivityStatusValue: Success, Caller: 9f8e7d6c-pipeline-sp, CallerIpAddress: 203.0.113.165, _ResourceId: /subscriptions/sub-1/resourceGroups/app/providers/Microsoft.Storage/storageAccounts/appsa}
+expect:
+  rows: 1
+  include:
+    - {Caller: mallory@contoso.com, StorageAccountCount: 3}
+  exclude:
+    - {Caller: 9f8e7d6c-pipeline-sp}
